@@ -1,0 +1,118 @@
+# MailPulse - Comprehensive .gitignore
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.dev/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Go
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+relay/vendor/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# React + Vite
+dashboard/dist/
+dashboard/build/
+
+# Vite
+dashboard/.vite/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Backups
+backups/
+*.backup
+*.dump
+
+# SSL certificates (never commit these!)
+*.pem
+*.key
+*.crt
+*.csr
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Coverage reports
+coverage/
+*.coverage
+
+# Build artifacts
+build/
+dist/
+
+# Lock files (commit these for reproducible builds)
+# package-lock.json
+# yarn.lock
+# go.sum
+
+# Local configuration overrides
+docker-compose.override.yml
+config.local.json
+
+# Email storage (for development)
+mail_storage/
+
+# Redis dumps
+dump.rdb
+
+# Security keys (NEVER COMMIT)
+*.private
+secrets/
+api_keys.txt

@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mailpulse-postgres
+    environment:
+      POSTGRES_DB: mailpulse
+      POSTGRES_USER: mailpulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailpulse"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: mailpulse-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme123}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MailPulse SMTP Relay (⚠️ AUTHENTICATED ONLY - NOT AN OPEN RELAY)
+  relay:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.relay
+    container_name: mailpulse-relay
+    environment:
+      - DATABASE_URL=postgres://mailpulse:${POSTGRES_PASSWORD:-changeme123}@postgres:5432/mailpulse?sslmode=disable
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme123}@redis:6379/0
+      - SMTP_PORT=2525
+      - HTTP_PORT=8080
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-changeme-32-char-encryption-key}
+    ports:
+      - "2525:2525"  # SMTP (AUTH REQUIRED)
+      - "8080:8080"  # HTTP API
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MailPulse Dashboard
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: mailpulse-dashboard
+    environment:
+      - VITE_RELAY_API_URL=http://relay:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - relay
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+# SECURITY WARNING:
+# This SMTP relay requires authentication for ALL connections.
+# It is NOT an open relay and will reject unauthenticated requests.
+# Change all default passwords in production!

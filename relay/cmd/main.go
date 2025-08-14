@@ -1,0 +1,138 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/Renespeare/mailpulse/relay/internal/api"
+	"github.com/Renespeare/mailpulse/relay/internal/auth"
+	"github.com/Renespeare/mailpulse/relay/internal/security"
+	"github.com/Renespeare/mailpulse/relay/internal/smtp"
+	"github.com/Renespeare/mailpulse/relay/internal/storage"
+	"github.com/joho/godotenv"
+)
+
+func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
+	log.Println("🚀 MailPulse Relay Server starting...")
+	log.Println("⚠️  SECURITY: This is NOT an open relay - all connections require authentication")
+	
+	// Initialize storage
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL environment variable is required")
+	}
+	
+	store, err := storage.NewPostgreSQLStorage(databaseURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
+	defer store.Close()
+	
+	log.Println("✅ Database connection established")
+	
+	// Initialize rate limiter
+	var rateLimiter security.RateLimiter
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL != "" {
+		redisLimiter, err := security.NewRedisRateLimiter(redisURL)
+		if err != nil {
+			log.Printf("⚠️  Failed to connect to Redis, using in-memory rate limiter: %v", err)
+			rateLimiter = security.NewInMemoryRateLimiter()
+		} else {
+			rateLimiter = redisLimiter
+			defer rateLimiter.Close()
+			log.Println("✅ Redis rate limiter connected")
+		}
+	} else {
+		rateLimiter = security.NewInMemoryRateLimiter()
+		log.Println("ℹ️  Using in-memory rate limiter (set REDIS_URL for production)")
+	}
+	
+	// Initialize authentication manager with storage adapter
+	storageAdapter := api.NewStorageAdapter(store)
+	authManager := auth.NewInMemoryAuthManager(storageAdapter)
+	
+	// Load existing projects from database
+	log.Println("🔍 Loading projects from database...")
+	if err := authManager.ReloadProjects(); err != nil {
+		log.Printf("⚠️  Could not load projects from database: %v", err)
+	}
+	
+	// Create a test project for development (fallback)
+	apiKey, apiKeyHash, err := authManager.GenerateAPIKey("mp_test")
+	if err != nil {
+		log.Fatalf("Failed to generate API key: %v", err)
+	}
+	
+	testProject := &auth.Project{
+		ID:             "test-project-1",
+		Name:           "Test Project",
+		APIKey:         apiKey,
+		APIKeyHash:     apiKeyHash,
+		Status:         "active",
+		SMTPHost:       "smtp.gmail.com",
+		SMTPPort:       587,
+		SMTPUsername:   "test@example.com",
+		QuotaDaily:     500,
+		QuotaPerMinute: 10,
+		RequireIPAllow: false,
+		UserID:         "test-user-1",
+		CreatedAt:      time.Now(),
+	}
+	
+	authManager.AddProject(testProject)
+	
+	log.Printf("🔑 Test API Key generated: %s", apiKey)
+	log.Printf("📝 Use this for testing: AUTH PLAIN %s test-password", apiKey)
+	
+	// Get ports
+	smtpPort := os.Getenv("SMTP_PORT")
+	if smtpPort == "" {
+		smtpPort = "2525"
+	}
+	
+	httpPort := os.Getenv("HTTP_PORT")
+	if httpPort == "" {
+		httpPort = "8080"
+	}
+	
+	// Initialize HTTP API server
+	apiServer := api.NewServer(authManager, store, rateLimiter)
+	
+	// Start HTTP API server in background
+	go func() {
+		if err := apiServer.Start(fmt.Sprintf(":%s", httpPort)); err != nil {
+			log.Fatalf("HTTP API server failed: %v", err)
+		}
+	}()
+	
+	// Initialize email forwarder
+	emailForwarder := smtp.NewEmailForwarder(authManager, store)
+	
+	// Initialize SMTP server
+	smtpConfig := smtp.Config{
+		Address:     fmt.Sprintf(":%s", smtpPort),
+		AuthManager: authManager,
+		Storage:     store,
+		RateLimiter: rateLimiter,
+		Forwarder:   emailForwarder,
+		RequireAuth: true,
+		RequireTLS:  false, // Disable TLS for development
+	}
+	
+	smtpServer := smtp.NewServer(smtpConfig)
+	
+	log.Printf("🔐 Starting SMTP server on port %s (AUTH REQUIRED)", smtpPort)
+	log.Println("📧 Ready to accept authenticated email connections")
+	
+	// Start the SMTP server (blocking)
+	if err := smtpServer.Start(); err != nil {
+		log.Fatalf("SMTP server failed: %v", err)
+	}
+}

@@ -1,0 +1,25 @@
+# Multi-stage build for MailPulse React Dashboard
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+COPY dashboard/package*.json ./
+RUN npm ci
+
+COPY dashboard/ ./
+RUN npm run build
+
+# Production image
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+# Install a simple static file server
+RUN npm install -g serve
+
+# Copy built assets
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 3000
+
+# Serve the built React app
+CMD ["serve", "-s", "dist", "-l", "3000"]
