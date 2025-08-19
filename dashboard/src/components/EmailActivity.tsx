@@ -280,7 +280,7 @@ function EmailActivity() {
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
             <div className="text-3xl font-bold text-gray-600 mb-1">
-              {Math.round(stats.totalSize / 1024)}KB
+              {(stats.totalSize / 1024).toFixed(1)}KB
             </div>
             <div className="text-sm font-medium text-gray-500">Total Size</div>
           </div>

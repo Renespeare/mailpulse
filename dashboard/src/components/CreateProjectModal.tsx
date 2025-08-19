@@ -45,7 +45,7 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
       return
     }
 
-    if (!formData.password.trim()) {
+    if (!isEditing && !formData.password.trim()) {
       setError('SMTP password is required')
       return
     }
@@ -166,8 +166,10 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
               />
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            {/* SMTP Password (only show when creating new projects) */}
+            {!isEditing && (
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 SMTP Password *
               </label>
               <div className="flex items-center space-x-2">
@@ -180,7 +182,7 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
                   required
                   placeholder="Auto-generated password"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm transition-colors"
-                  readOnly={!isEditing}
+                  readOnly={isEditing}
                 />
                 <button
                   type="button"
@@ -220,6 +222,38 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
                 </div>
               </div>
             </div>
+            )}
+
+            {/* SMTP Password (not shown for security when editing) */}
+            {isEditing && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SMTP Password
+                </label>
+                <p className="text-xs text-gray-500 italic">
+                  Password is securely encrypted and cannot be retrieved. Create a new project for a new password.
+                </p>
+              </div>
+            )}
+
+            {/* Status (only show when editing) */}
+            {isEditing && (
+              <div>
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <select
+                  id="status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Email Delivery Configuration */}
@@ -231,7 +265,7 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
               </p>
             </div>
             <p className="text-sm text-gray-600">
-              Configure your email provider (Gmail, Outlook, Yahoo, SendGrid, etc.) for actual email delivery. Leave blank for testing/simulation only.
+              Configure your email provider (Gmail, Outlook, Yahoo, etc.) for actual email delivery. Leave blank for testing/simulation only.
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -311,6 +345,11 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
                 <p className="text-xs text-gray-500 mt-1">
                   Gmail: App password • Outlook: Account password • Others: API key or service password
                 </p>
+                {isEditing && (
+                  <p className="text-xs text-gray-500 italic">
+                    Leave empty to keep current password, or enter new password to update.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -381,7 +420,7 @@ function CreateProjectModal({ onClose, onSubmit, initialData, isEditing = false 
             </button>
             <button
               type="submit"
-              disabled={loading || !formData.name || !formData.password}
+              disabled={loading || !formData.name || (!isEditing && !formData.password)}
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (

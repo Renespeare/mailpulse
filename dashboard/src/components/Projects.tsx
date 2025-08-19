@@ -111,8 +111,6 @@ function Projects() {
         return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'
       case 'inactive':
         return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'
-      case 'suspended':
-        return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800'
       default:
         return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800'
     }
@@ -238,7 +236,7 @@ function Projects() {
                   )}
 
                   {/* API Key */}
-                  <div className="space-y-3 mb-6">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
                       <div className="flex items-center space-x-2">
@@ -278,20 +276,24 @@ function Projects() {
                   </div>
 
                   {/* Usage Stats */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-3 gap-3 mt-6">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{quota?.emailsToday || 0}</div>
-                      <div className="text-xs text-gray-500">Emails Sent Today</div>
+                      <div className="text-xl font-bold text-blue-600">{quota?.emailsToday || 0}</div>
+                      <div className="text-xs text-gray-500">Sent Today</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{project.quotaDaily}</div>
+                      <div className="text-xl font-bold text-green-600">{project.quotaDaily}</div>
                       <div className="text-xs text-gray-500">Daily Limit</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-xl font-bold text-purple-600">{project.quotaPerMinute}</div>
+                      <div className="text-xs text-gray-500">Per Minute</div>
                     </div>
                   </div>
 
                   {/* Usage Progress Bar */}
                   {quota && (
-                    <div className="mb-6">
+                    <div className="mt-6">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-500">Daily Usage</span>
                         <span className="text-xs text-gray-500">
@@ -315,7 +317,7 @@ function Projects() {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="space-y-3 pt-4 border-t border-gray-100">
+                  <div className="space-y-3 pt-6 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <button
                         onClick={() => handleToggleStatus(project.id, project.status)}

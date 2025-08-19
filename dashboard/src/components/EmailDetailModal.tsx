@@ -195,7 +195,7 @@ function EmailDetailModal({ email, onClose, projectName }: EmailDetailModalProps
             <div>
               <label className="font-medium text-gray-700">Size</label>
               <div className="mt-1">
-                <span className="text-gray-900">{Math.round(email.size / 1024)} KB</span>
+                <span className="text-gray-900">{(email.size / 1024).toFixed(1)} KB</span>
               </div>
             </div>
           </div>

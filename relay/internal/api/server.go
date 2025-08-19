@@ -432,6 +432,35 @@ func (s *Server) updateProjectHandler(w http.ResponseWriter, r *http.Request) {
 		project.Status = status
 	}
 	
+	// SMTP Configuration updates
+	if smtpHost, ok := updates["smtpHost"].(string); ok {
+		project.SMTPHost = stringPtrFromString(smtpHost)
+	}
+	if smtpPort, ok := updates["smtpPort"].(float64); ok {
+		project.SMTPPort = intPtrFromInt(int(smtpPort))
+	}
+	if smtpUser, ok := updates["smtpUser"].(string); ok {
+		project.SMTPUser = stringPtrFromString(smtpUser)
+	}
+	if smtpPassword, ok := updates["smtpPassword"].(string); ok && smtpPassword != "" {
+		// Encrypt the SMTP password before storing
+		encryptedPassword, err := crypto.EncryptSMTPPassword(smtpPassword)
+		if err != nil {
+			log.Printf("Failed to encrypt SMTP password: %v", err)
+			http.Error(w, "Failed to encrypt SMTP password", http.StatusInternalServerError)
+			return
+		}
+		project.SMTPPasswordEnc = &encryptedPassword
+	}
+	
+	// Quota updates
+	if quotaDaily, ok := updates["quotaDaily"].(float64); ok && quotaDaily >= 0 {
+		project.QuotaDaily = int(quotaDaily)
+	}
+	if quotaPerMinute, ok := updates["quotaPerMinute"].(float64); ok && quotaPerMinute >= 0 {
+		project.QuotaPerMinute = int(quotaPerMinute)
+	}
+	
 	// Update in database
 	if err := s.storage.UpdateProject(projectID, project); err != nil {
 		log.Printf("Failed to update project %s: %v", projectID, err)
