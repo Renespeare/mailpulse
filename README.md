@@ -25,7 +25,7 @@ MailPulse is a purpose-built secure SMTP monitoring solution with:
 
 ### 1. Clone and Configure
 ```bash
-git clone <your-repo>
+git clone git@github.com:Renespeare/mailpulse.git
 cd mailpulse
 cp .env.example .env
 # Edit .env with your secure passwords
@@ -48,15 +48,15 @@ Visit http://localhost:3000 and start creating projects.
 │ (API key & pass) │     │                 │     │  (Gmail, etc.)  │
 └──────────────────┘     │   + HTTP API    │     └─────────────────┘
                          └─────────────────┘
-                                │
-                                ▼
-                      ┌─────────────────┐
-                      │   PostgreSQL    │
-                      │ (Email + Quotas)│
-                      └─────────────────┘
-                                ▲
-                                │ (HTTP API)
-                                │
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │   PostgreSQL    │
+                         │ (Email + Quotas)│
+                         └─────────────────┘
+                                  ▲
+                                  │ (HTTP API)
+                                  │
                          ┌─────────────────┐
                          │    Dashboard    │
                          │  (React+Vite)   │
@@ -89,45 +89,10 @@ Visit http://localhost:3000 and start creating projects.
 ## Configuration Example
 
 ### SMTP Client Configuration
-```go
-// Go example
-package main
 
-import (
-    "fmt"
-    "net/smtp"
-    "strings"
-)
+For complete examples, see [docs/SENDING_EMAIL.md](docs/SENDING_EMAIL.md).
 
-func main() {
-    // MailPulse SMTP Configuration
-    host := "your-mailpulse-server.com"
-    port := "2525"
-    username := "mp_live_your-api-key-here"  // Your project API key
-    password := "your-project-password"       // Your project password
-    
-    // Connect and authenticate
-    auth := smtp.PlainAuth("", username, password, host)
-    
-    // Email content
-    to := []string{"recipient@example.com"}
-    from := "sender@yourdomain.com"
-    subject := "Test Email via MailPulse"
-    body := "Hello from MailPulse Go client!"
-    
-    message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
-        from, strings.Join(to, ", "), subject, body)
-    
-    // Send email
-    err := smtp.SendMail(host+":"+port, auth, from, to, []byte(message))
-    if err != nil {
-        fmt.Printf("Failed to send email: %v\n", err)
-        return
-    }
-    
-    fmt.Println("✅ Email sent successfully via MailPulse!")
-}
-```
+For additional test clients, see [test-email-sender/](test-email-sender/) directory.
 
 ### Environment Variables
 ```bash
@@ -139,6 +104,7 @@ ENCRYPTION_KEY=your-32-character-encryption-key
 
 # SMTP
 SMTP_PORT=2525
+HTTP_PORT=8080
 SMTP_TLS_REQUIRED=true
 ```
 
@@ -147,17 +113,17 @@ SMTP_TLS_REQUIRED=true
 ```
 mailpulse/
 ├── relay/                 # Go SMTP relay
-│   ├── cmd/              # Main application
-│   └── internal/         # Core packages
-│       ├── auth/         # Authentication
-│       ├── storage/      # Database operations
-│       ├── security/     # Rate limiting
-│       └── smtp/         # SMTP server
-├── dashboard/            # React + Vite dashboard
-│   ├── src/             # Source files and components
-├── docker/              # Docker configurations
-├── docs/                # Documentation
-└── docker-compose.yml   # Development setup
+│   ├── cmd/               # Main application
+│   └── internal/          # Core packages
+│       ├── auth/          # Authentication
+│       ├── storage/       # Database operations
+│       ├── security/      # Rate limiting
+│       └── smtp/          # SMTP server
+├── dashboard/             # React + Vite dashboard
+│   ├── src/               # Source files and components
+├── docker/                # Docker configurations
+├── docs/                  # Documentation
+└── docker-compose.yml     # Development setup
 ```
 
 ## Development
@@ -206,11 +172,25 @@ curl -H "Authorization: Bearer mp_live_your-api-key" \
      https://your-server.com/api/emails
 ```
 
-### Endpoints
-- `GET /api/emails` - List emails with pagination
-- `POST /api/emails/{id}/resend` - Resend failed email
-- `GET /api/projects` - List projects
-- `GET /api/audit` - Security audit logs
+### API Endpoints
+
+#### Health Check
+- `GET /health` - Server health status
+
+#### Email Management
+- `GET /api/emails` - List emails with pagination (optional `?project=id` filter)
+- `GET /api/emails/stats/{projectId}` - Email statistics for a project
+- `POST /api/emails/{emailId}/resend` - Resend failed email
+
+#### Project Management
+- `GET /api/projects` - List all projects
+- `POST /api/projects` - Create new project
+- `GET /api/projects/{projectId}` - Get specific project
+- `PATCH /api/projects/{projectId}` - Update project settings
+- `DELETE /api/projects/{projectId}` - Delete project (soft delete)
+
+#### Quota Monitoring
+- `GET /api/quota/{projectId}` - Real-time quota usage and limits
 
 
 ## License

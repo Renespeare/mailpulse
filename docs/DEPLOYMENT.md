@@ -10,7 +10,7 @@
 ### 1. Clone and Configure
 
 ```bash
-git clone <your-mailpulse-repo>
+git clone git@github.com:Renespeare/mailpulse.git
 cd mailpulse
 cp .env.example .env
 ```

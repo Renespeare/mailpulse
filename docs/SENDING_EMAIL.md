@@ -1,13 +1,15 @@
 # Email Sending Example
 
-# SMTP Settings:
-SMTP Host: localhost (or your MailPulse server)
-SMTP Port: 2525
-Username: mp_live_gs7e7526123feg8621chad158294284r (your API key)
-Password: dmes-mnsk-laca-4801 (your project password)
+## SMTP Settings
 
-Using Python (with smtplib)
+- **Host:** localhost (or your MailPulse server)
+- **Port:** 2525
+- **Username:** mp_live_key... (your API key)
+- **Password:** password-example (your project password)
 
+## Using Python (with smtplib)
+
+```python
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -15,8 +17,8 @@ from email.mime.multipart import MIMEMultipart
 # MailPulse SMTP Configuration
 SMTP_HOST = "localhost"  # or your MailPulse server IP
 SMTP_PORT = 2525
-USERNAME = "mp_live_gs7e7526123feg8621chad158294284r"  # Your API key
-PASSWORD = "dmes-mnsk-laca-4801"  # Your project password
+USERNAME = "mp_live_key..."  # Your API key
+PASSWORD = "password-example"  # Your project password
 
 # Create message
 msg = MIMEMultipart()
@@ -49,9 +51,53 @@ try:
 
 except Exception as e:
     print(f"Failed to send email: {e}")
+```
 
-Using Node.js (with nodemailer)
+## Using Go (with net/smtp)
 
+```go
+// Go example
+package main
+
+import (
+    "fmt"
+    "net/smtp"
+    "strings"
+)
+
+func main() {
+    // MailPulse SMTP Configuration
+    host := "your-mailpulse-server.com"
+    port := "2525"
+    username := "mp_live_your-api-key-here"  // Your project API key
+    password := "your-project-password"       // Your project password
+    
+    // Connect and authenticate
+    auth := smtp.PlainAuth("", username, password, host)
+    
+    // Email content
+    to := []string{"recipient@example.com"}
+    from := "sender@yourdomain.com"
+    subject := "Test Email via MailPulse"
+    body := "Hello from MailPulse Go client!"
+    
+    message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
+        from, strings.Join(to, ", "), subject, body)
+    
+    // Send email
+    err := smtp.SendMail(host+":"+port, auth, from, to, []byte(message))
+    if err != nil {
+        fmt.Printf("Failed to send email: %v\n", err)
+        return
+    }
+    
+    fmt.Println("✅ Email sent successfully via MailPulse!")
+}
+```
+
+## Using Node.js (with nodemailer)
+
+```javascript
 const nodemailer = require('nodemailer');
 
 // MailPulse SMTP Configuration
@@ -60,8 +106,8 @@ const transporter = nodemailer.createTransporter({
     port: 2525,
     secure: false,  // true for 465, false for other ports
     auth: {
-        user: 'mp_live_cc7e7266975fde8699cdad926174784e',  // Your API key
-        pass: 'sadi-bino-savo-4616'  // Your project password
+        user: 'mp_live_key...',  // Your API key
+        pass: 'password-example'  // Your project password
     }
 });
 
@@ -82,9 +128,11 @@ transporter.sendMail(mailOptions, (error, info) => {
         console.log('Email sent successfully:', info.response);
     }
 });
+```
 
-# Using Telnet (for testing)
+## Using Telnet (for testing)
 
+```bash
 telnet localhost 2525
 > 220 MailPulse SMTP Server Ready
 EHLO yourdomain.com
@@ -109,14 +157,17 @@ Hello! This is a test email sent through MailPulse.
 > 250 OK
 QUIT
 > 221 Bye
+```
 
-Environment Variables (Recommended)
+## Environment Variables (Recommended)
 
-## .env file
+```bash
+# .env file
 MAILPULSE_HOST=localhost
 MAILPULSE_PORT=2525
-MAILPULSE_API_KEY=mp_live_cc7e7266975fde8699cdad926174784e
-MAILPULSE_PASSWORD=sadi-bino-savo-4616
+MAILPULSE_API_KEY=mp_live_key..
+MAILPULSE_PASSWORD=password
+```
 
 ## AUTH PLAIN Format (Technical Details)
 
@@ -128,8 +179,8 @@ echo -n -e '\0mp_live_your_api_key\0your_password' | base64
 ```
 
 **Example:**
-- API Key: `mp_live_cc7e7266975fde8699cdad926174784e`
-- Password: `sadi-bino-savo-4616`
+- API Key: `mp_live_key...`
+- Password: `password-example`
 - Encoded: `AG1wX2xpdmVfY2M3ZTcyNjY5NzVmZGU4Njk5Y2RhZDkyNjE3NDc4NGUAc2FkaS1iaW5vLXNhdm8tNDYxNg==`
 
 Most SMTP libraries (Python smtplib, Node.js nodemailer, etc.) handle this encoding automatically.

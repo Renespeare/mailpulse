@@ -63,9 +63,11 @@ EHLO client.example.com
 STARTTLS
 > 220 Ready to start TLS
 
-# 3. Authenticate with API key
-AUTH PLAIN mp_live_your-api-key your-project-password
+# 3. Authenticate with API key (base64 encoded)
+AUTH PLAIN AG1wX2xpdmVfY2M3ZTcyNjY5NzVmZGU4Njk5Y2RhZDkyNjE3NDc4NGUAc2FkaS1iaW5vLXNhdm8tNDYxNg==
 > 235 Authentication successful
+
+# Note: The base64 string encodes: \0mp_live_your-api-key\0your-password
 
 # 4. Now you can send emails
 MAIL FROM:<sender@example.com>
@@ -87,10 +89,44 @@ For complete examples of sending email, see [docs/SENDING_EMAIL.md](../docs/SEND
 curl http://localhost:8080/health
 ```
 
-### Email Statistics (requires auth)
+### Email Management
 ```bash
-curl -H "Authorization: Bearer your-api-key" \
-     http://localhost:8080/api/emails
+# List emails with pagination (optional ?project=projectId filter)
+curl http://localhost:8080/api/emails
+
+# Get email statistics for a project
+curl http://localhost:8080/api/emails/stats/{projectId}
+
+# Resend failed email
+curl -X POST http://localhost:8080/api/emails/{emailId}/resend
+```
+
+### Project Management
+```bash
+# List all projects
+curl http://localhost:8080/api/projects
+
+# Create new project
+curl -X POST http://localhost:8080/api/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My App","password":"secret","quotaDaily":500,"quotaPerMinute":10}'
+
+# Get specific project
+curl http://localhost:8080/api/projects/{projectId}
+
+# Update project settings
+curl -X PATCH http://localhost:8080/api/projects/{projectId} \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Updated Name"}'
+
+# Delete project (soft delete)
+curl -X DELETE http://localhost:8080/api/projects/{projectId}
+```
+
+### Quota Monitoring
+```bash
+# Get real-time quota usage and limits
+curl http://localhost:8080/api/quota/{projectId}
 ```
 
 ## Security Features
@@ -136,18 +172,8 @@ Projects are configured via the dashboard or API:
 ```
 
 ### SMTP Client Configuration
-```javascript
-// Node.js example
-const transporter = nodemailer.createTransporter({
-  host: 'your-mailpulse-server.com',
-  port: 2525,
-  secure: false, // STARTTLS
-  auth: {
-    user: 'mp_live_...',
-    pass: 'your-project-password'
-  }
-});
-```
+
+For complete examples in multiple languages, see [docs/SENDING_EMAIL.md](../docs/SENDING_EMAIL.md).
 
 ## Architecture
 
