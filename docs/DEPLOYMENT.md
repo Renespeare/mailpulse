@@ -20,7 +20,6 @@ cp .env.example .env
 ```bash
 # .env file
 POSTGRES_PASSWORD=your-secure-password-here
-REDIS_PASSWORD=your-redis-password-here
 ENCRYPTION_KEY=your-32-character-encryption-key
 ```
 
@@ -46,7 +45,6 @@ Visit http://localhost:3000 and register your admin account.
 ```bash
 # Use strong, unique passwords
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
-REDIS_PASSWORD=$(openssl rand -base64 32)
 ENCRYPTION_KEY=$(openssl rand -base64 32)
 
 # Production URLs
@@ -159,17 +157,6 @@ http.Handle("/metrics", promhttp.Handler())
 ```
 
 ### Performance Tuning
-
-#### Redis Configuration
-```yaml
-redis:
-  command: >
-    redis-server
-    --maxmemory 512mb
-    --maxmemory-policy allkeys-lru
-    --save 900 1
-    --appendonly yes
-```
 
 #### Go Relay Optimization
 ```dockerfile

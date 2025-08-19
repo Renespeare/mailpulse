@@ -50,10 +50,10 @@ Visit http://localhost:3000 and start creating projects.
                          └─────────────────┘
                                 │
                                 ▼
-                      ┌─────────────────┐  ┌─────────────────┐
-                      │   PostgreSQL    │  │     Redis       │
-                      │   (Email Data)  │  │ (Rate Limiting) │
-                      └─────────────────┘  └─────────────────┘
+                      ┌─────────────────┐
+                      │   PostgreSQL    │
+                      │ (Email + Quotas)│
+                      └─────────────────┘
                                 ▲
                                 │ (HTTP API)
                                 │
@@ -69,7 +69,7 @@ Visit http://localhost:3000 and start creating projects.
 - **Go-based** secure SMTP server
 - **Authenticated only** - No open relay functionality
 - **PostgreSQL integration** for email storage
-- **Redis-backed** rate limiting and queuing
+- **In-memory** rate limiting and quota tracking
 - **TLS/STARTTLS** required for all connections
 
 ### Dashboard (`dashboard/`)
@@ -81,7 +81,7 @@ Visit http://localhost:3000 and start creating projects.
 
 ### Security Features
 - **API Key Authentication** - bcrypt-hashed API keys
-- **Rate Limiting** - Redis-backed per-project quotas
+- **Rate Limiting** - In-memory per-project quotas
 - **Audit Logging** - Comprehensive security event tracking
 - **Encryption** - AES-256 for sensitive data
 - **IP Allowlists** - Optional IP-based restrictions
@@ -133,7 +133,6 @@ func main() {
 ```bash
 # Database
 DATABASE_URL=postgres://user:pass@localhost:5432/mailpulse
-REDIS_URL=redis://localhost:6379
 
 # Security
 ENCRYPTION_KEY=your-32-character-encryption-key
@@ -167,13 +166,12 @@ mailpulse/
 - Go 1.21+
 - Node.js 18+
 - PostgreSQL 15+
-- Redis 7+
 - Docker & Docker Compose
 
 ### Local Development
 ```bash
-# Start databases
-docker-compose up postgres redis -d
+# Start database
+docker-compose up postgres -d
 
 # Start relay
 cd relay

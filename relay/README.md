@@ -22,13 +22,11 @@ MailPulse is a secure Go-based SMTP server that:
 ### Prerequisites
 - Go 1.21+
 - PostgreSQL 15+
-- Redis 7+
 
 ### Environment Variables
 ```bash
 # Required
 DATABASE_URL=postgres://user:pass@localhost:5432/mailpulse
-REDIS_URL=redis://localhost:6379
 ENCRYPTION_KEY=your-32-character-encryption-key
 
 # SMTP Configuration
@@ -105,7 +103,7 @@ curl -H "Authorization: Bearer your-api-key" \
 
 ### Rate Limiting
 - Per-project quotas (daily/per-minute)
-- Redis-backed counters
+- In-memory quota tracking
 - Automatic blocking on quota exceeded
 - Configurable limits per project
 
@@ -163,7 +161,7 @@ const transporter = nodemailer.createTransporter({
                                ▼
                         ┌─────────────────┐
                         │   PostgreSQL    │
-                        │   + Redis       │
+                        │ (Email + Quotas)│
                         └─────────────────┘
 ```
 
@@ -271,8 +269,8 @@ curl http://localhost:8080/health
 **Rate Limited**
 - Check project quota settings
 - Review current usage in dashboard
-- Verify Redis connection
 - Check for abuse/unusual traffic
+- Review in-memory quota limits
 
 ### Debug Mode
 ```bash

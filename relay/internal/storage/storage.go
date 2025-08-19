@@ -59,6 +59,17 @@ type AuditLog struct {
 	CreatedAt time.Time
 }
 
+// QuotaUsage represents quota usage statistics
+type QuotaUsage struct {
+	ProjectID       string
+	DailyUsed      int
+	DailyLimit     int
+	MinuteUsed     int
+	MinuteLimit    int
+	DailyRemaining int
+	MinuteRemaining int
+}
+
 // Storage interface defines database operations
 type Storage interface {
 	// Email operations
@@ -74,6 +85,10 @@ type Storage interface {
 	UpdateProject(id string, project *Project) error
 	DeleteProject(id string) error
 	ListAllProjects() ([]*Project, error)
+	
+	// Quota operations
+	GetQuotaUsage(projectID string) (*QuotaUsage, error)
+	CheckQuotaLimits(projectID string) error
 	
 	// Audit operations
 	RecordAuditLog(log *AuditLog) error
@@ -531,6 +546,73 @@ func (s *PostgreSQLStorage) DeleteProject(id string) error {
 // Ping checks database connectivity
 func (s *PostgreSQLStorage) Ping() error {
 	return s.db.Ping()
+}
+
+// GetQuotaUsage retrieves current quota usage for a project
+func (s *PostgreSQLStorage) GetQuotaUsage(projectID string) (*QuotaUsage, error) {
+	// First get project limits
+	project, err := s.GetProject(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project: %w", err)
+	}
+	
+	// Count emails sent in the last 24 hours
+	dailyQuery := `
+		SELECT COUNT(*) FROM emails 
+		WHERE project_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'
+	`
+	var dailyUsed int
+	if err := s.db.QueryRow(dailyQuery, projectID).Scan(&dailyUsed); err != nil {
+		return nil, fmt.Errorf("failed to get daily usage: %w", err)
+	}
+	
+	// Count emails sent in the last minute
+	minuteQuery := `
+		SELECT COUNT(*) FROM emails 
+		WHERE project_id = $1 AND sent_at > NOW() - INTERVAL '1 minute'
+	`
+	var minuteUsed int
+	if err := s.db.QueryRow(minuteQuery, projectID).Scan(&minuteUsed); err != nil {
+		return nil, fmt.Errorf("failed to get minute usage: %w", err)
+	}
+	
+	quota := &QuotaUsage{
+		ProjectID:       projectID,
+		DailyUsed:      dailyUsed,
+		DailyLimit:     project.QuotaDaily,
+		MinuteUsed:     minuteUsed,
+		MinuteLimit:    project.QuotaPerMinute,
+		DailyRemaining: project.QuotaDaily - dailyUsed,
+		MinuteRemaining: project.QuotaPerMinute - minuteUsed,
+	}
+	
+	// Ensure remaining counts don't go negative
+	if quota.DailyRemaining < 0 {
+		quota.DailyRemaining = 0
+	}
+	if quota.MinuteRemaining < 0 {
+		quota.MinuteRemaining = 0
+	}
+	
+	return quota, nil
+}
+
+// CheckQuotaLimits checks if a project has exceeded its quotas
+func (s *PostgreSQLStorage) CheckQuotaLimits(projectID string) error {
+	quota, err := s.GetQuotaUsage(projectID)
+	if err != nil {
+		return fmt.Errorf("failed to check quotas: %w", err)
+	}
+	
+	if quota.DailyRemaining <= 0 {
+		return fmt.Errorf("daily quota exceeded: %d/%d emails used", quota.DailyUsed, quota.DailyLimit)
+	}
+	
+	if quota.MinuteRemaining <= 0 {
+		return fmt.Errorf("per-minute quota exceeded: %d/%d emails used", quota.MinuteUsed, quota.MinuteLimit)
+	}
+	
+	return nil
 }
 
 // Close closes the database connection

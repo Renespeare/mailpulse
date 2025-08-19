@@ -36,23 +36,9 @@ func main() {
 	
 	log.Println("✅ Database connection established")
 	
-	// Initialize rate limiter
-	var rateLimiter security.RateLimiter
-	redisURL := os.Getenv("REDIS_URL")
-	if redisURL != "" {
-		redisLimiter, err := security.NewRedisRateLimiter(redisURL)
-		if err != nil {
-			log.Printf("⚠️  Failed to connect to Redis, using in-memory rate limiter: %v", err)
-			rateLimiter = security.NewInMemoryRateLimiter()
-		} else {
-			rateLimiter = redisLimiter
-			defer rateLimiter.Close()
-			log.Println("✅ Redis rate limiter connected")
-		}
-	} else {
-		rateLimiter = security.NewInMemoryRateLimiter()
-		log.Println("ℹ️  Using in-memory rate limiter (set REDIS_URL for production)")
-	}
+	// Initialize simple in-memory rate limiter
+	rateLimiter := security.NewInMemoryRateLimiter()
+	log.Println("✅ Using in-memory rate limiter")
 	
 	// Initialize authentication manager with storage adapter
 	storageAdapter := api.NewStorageAdapter(store)

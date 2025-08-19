@@ -120,25 +120,35 @@ func (s *Server) quotaUsageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Get quota usage from rate limiter
-	usage, err := s.rateLimiter.GetQuotaUsage(projectID)
+	// Get quota usage from storage
+	usage, err := s.storage.GetQuotaUsage(projectID)
 	if err != nil {
 		log.Printf("Failed to get quota usage for project %s: %v", projectID, err)
 		http.Error(w, "Failed to get quota usage", http.StatusInternalServerError)
 		return
 	}
 	
-	// TODO: Get project details from auth manager to include quota limits
-	// For now, hardcode the limits that match our test project
+	// Calculate usage percentages
+	minutePercent := 0.0
+	if usage.MinuteLimit > 0 {
+		minutePercent = float64(usage.MinuteUsed) / float64(usage.MinuteLimit) * 100
+	}
+	
+	dailyPercent := 0.0
+	if usage.DailyLimit > 0 {
+		dailyPercent = float64(usage.DailyUsed) / float64(usage.DailyLimit) * 100
+	}
+	
 	response := map[string]interface{}{
-		"projectId":        usage.ProjectID,
-		"emailsThisMinute": usage.EmailsThisHour, // Using hour field as minute approximation
-		"emailsToday":      usage.EmailsToday,
-		"lastEmailSent":    usage.LastEmailSent,
-		"quotaPerMinute":   10,  // Hardcoded for now
-		"quotaDaily":       500, // Hardcoded for now
-		"minuteUsagePercent": float64(usage.EmailsThisHour) / 10.0 * 100,
-		"dailyUsagePercent":  float64(usage.EmailsToday) / 500.0 * 100,
+		"projectId":           usage.ProjectID,
+		"dailyUsed":          usage.DailyUsed,
+		"dailyLimit":         usage.DailyLimit,
+		"dailyRemaining":     usage.DailyRemaining,
+		"minuteUsed":         usage.MinuteUsed,
+		"minuteLimit":        usage.MinuteLimit,
+		"minuteRemaining":    usage.MinuteRemaining,
+		"dailyUsagePercent":  dailyPercent,
+		"minuteUsagePercent": minutePercent,
 	}
 	
 	w.Header().Set("Content-Type", "application/json")

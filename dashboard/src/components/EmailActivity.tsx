@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { getEmails, getProjects, resendEmail, type Email, type Project } from '../lib/api'
 import EmailDetailModal from './EmailDetailModal'
+import QuotaMonitor from './QuotaMonitor'
 
 function EmailActivity() {
   const [emails, setEmails] = useState<Email[]>([])
@@ -18,6 +19,9 @@ function EmailActivity() {
   const [projectFilter, setProjectFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [resendingEmail, setResendingEmail] = useState<string | null>(null)
+  const [showQuotaMonitor, setShowQuotaMonitor] = useState(false)
+  const [quotaProjectId, setQuotaProjectId] = useState<string | null>(null)
+  const [quotaRefreshTrigger, setQuotaRefreshTrigger] = useState(0)
 
   const fetchEmails = async () => {
     try {
@@ -30,6 +34,14 @@ function EmailActivity() {
     }
   }
 
+  const handleRefresh = async () => {
+    await fetchEmails()
+    // Trigger quota refresh for the current project
+    if (quotaProjectId) {
+      setQuotaRefreshTrigger(prev => prev + 1)
+    }
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
@@ -38,17 +50,37 @@ function EmailActivity() {
           getEmails(projectFilter === 'all' ? undefined : projectFilter),
           getProjects()
         ])
+        // Batch state updates to prevent multiple renders
         setEmails(emailsData || [])
         setProjects(projectsData || [])
+        setLoading(false) // Move setLoading(false) here to batch with other updates
       } catch (error) {
         console.error('Failed to fetch data:', error)
-      } finally {
         setLoading(false)
       }
     }
 
     fetchData()
   }, [projectFilter])
+
+  // Wait for EmailActivity to be stable before showing QuotaMonitor
+  useEffect(() => {
+    // Hide QuotaMonitor when project changes
+    if (quotaProjectId !== projectFilter) {
+      setShowQuotaMonitor(false)
+      setQuotaProjectId(null)
+    }
+    
+    if (projectFilter !== 'all' && !loading) {
+      // Small delay to ensure all renders are complete
+      const timer = setTimeout(() => {
+        setQuotaProjectId(projectFilter)
+        setShowQuotaMonitor(true)
+      }, 150)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [projectFilter, loading, quotaProjectId])
 
   const handleProjectChange = (projectId: string) => {
     setProjectFilter(projectId)
@@ -166,7 +198,7 @@ function EmailActivity() {
           <div className="flex items-center space-x-4">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{stats.total} emails</span>
             <button 
-              onClick={fetchEmails}
+              onClick={handleRefresh}
               className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
               disabled={loading}
             >
@@ -252,6 +284,13 @@ function EmailActivity() {
             </div>
             <div className="text-sm font-medium text-gray-500">Total Size</div>
           </div>
+        </div>
+      )}
+
+      {/* Quota Monitor - only show after EmailActivity is stable */}
+      {showQuotaMonitor && quotaProjectId && (
+        <div className="mb-6">
+          <QuotaMonitor projectId={quotaProjectId} refreshTrigger={quotaRefreshTrigger} />
         </div>
       )}
 

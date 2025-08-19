@@ -447,7 +447,7 @@ func (s *SMTPSession) processEmail() error {
 	}
 	
 	// Check email quotas before processing
-	if err := s.rateLimiter.CheckEmailQuota(s.project.ID, s.project.QuotaPerMinute, s.project.QuotaDaily); err != nil {
+	if err := s.storage.CheckQuotaLimits(s.project.ID); err != nil {
 		log.Printf("Email quota exceeded for project %s: %v", s.project.ID, err)
 		return fmt.Errorf("quota exceeded: %w", err)
 	}
