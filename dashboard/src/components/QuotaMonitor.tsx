@@ -23,12 +23,8 @@ function QuotaMonitor({ projectId, refreshTrigger }: QuotaMonitorProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  console.log('QuotaMonitor: Component render with projectId:', projectId)
-
   const fetchQuotaData = async () => {
     if (!projectId) return
-    
-    console.log('QuotaMonitor: Fetching quota for project:', projectId)
     
     try {
       const response = await fetch(`http://localhost:8080/api/quota/${projectId}`)
