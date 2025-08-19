@@ -1,4 +1,4 @@
-# MailPulse 📧
+# MailPulse 📮
 
 **Secure Self-hosted SMTP Monitoring Dashboard**
 
@@ -174,23 +174,14 @@ curl -H "Authorization: Bearer mp_live_your-api-key" \
 
 ### API Endpoints
 
-#### Health Check
-- `GET /health` - Server health status
+Complete API documentation available in [relay/README.md](relay/README.md#api-endpoints)
 
-#### Email Management
-- `GET /api/emails` - List emails with pagination (optional `?project=id` filter)
-- `GET /api/emails/stats/{projectId}` - Email statistics for a project
-- `POST /api/emails/{emailId}/resend` - Resend failed email
-
-#### Project Management
-- `GET /api/projects` - List all projects
-- `POST /api/projects` - Create new project
-- `GET /api/projects/{projectId}` - Get specific project
-- `PATCH /api/projects/{projectId}` - Update project settings
-- `DELETE /api/projects/{projectId}` - Delete project (soft delete)
-
-#### Quota Monitoring
-- `GET /api/quota/{projectId}` - Real-time quota usage and limits
+**Quick Reference:**
+- Health: `GET /health`
+- Projects: `GET /api/projects` 
+- Emails: `GET /api/emails`
+- Quotas: `GET /api/quota/{projectId}`
+- Audit Logs: `GET /api/audit`
 
 
 ## License

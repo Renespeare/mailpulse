@@ -84,50 +84,39 @@ For complete examples of sending email, see [docs/SENDING_EMAIL.md](../docs/SEND
 
 ## API Endpoints
 
-### Health Check
-```bash
-curl http://localhost:8080/health
-```
+#### Health Check
+- `GET /health` - Server health status
 
-### Email Management
-```bash
-# List emails with pagination (optional ?project=projectId filter)
-curl http://localhost:8080/api/emails
+#### Email Management
+- `GET /api/emails` - List emails with pagination (optional `?project=id` filter)
+- `GET /api/emails/stats/{projectId}` - Email statistics for a project
+- `POST /api/emails/{emailId}/resend` - Resend failed email
 
-# Get email statistics for a project
-curl http://localhost:8080/api/emails/stats/{projectId}
+#### Project Management
+- `GET /api/projects` - List all projects
+- `POST /api/projects` - Create new project
+- `GET /api/projects/{projectId}` - Get specific project
+- `PATCH /api/projects/{projectId}` - Update project settings
+- `DELETE /api/projects/{projectId}` - Delete project (soft delete)
 
-# Resend failed email
-curl -X POST http://localhost:8080/api/emails/{emailId}/resend
-```
+#### Quota Monitoring
+- `GET /api/quota/{projectId}` - Real-time quota usage and limits
 
-### Project Management
-```bash
-# List all projects
-curl http://localhost:8080/api/projects
+#### Audit Logs
+- `GET /api/audit` - All audit logs with pagination (`?limit=50&offset=0`)
+- `GET /api/audit/{projectId}` - Project-specific audit logs
 
-# Create new project
-curl -X POST http://localhost:8080/api/projects \
-  -H "Content-Type: application/json" \
-  -d '{"name":"My App","password":"secret","quotaDaily":500,"quotaPerMinute":10}'
-
-# Get specific project
-curl http://localhost:8080/api/projects/{projectId}
-
-# Update project settings
-curl -X PATCH http://localhost:8080/api/projects/{projectId} \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Updated Name"}'
-
-# Delete project (soft delete)
-curl -X DELETE http://localhost:8080/api/projects/{projectId}
-```
-
-### Quota Monitoring
-```bash
-# Get real-time quota usage and limits
-curl http://localhost:8080/api/quota/{projectId}
-```
+**Audit Events Tracked:**
+- `smtp_auth_success` - Successful SMTP authentication
+- `smtp_auth_failed` - Failed SMTP authentication attempts
+- `smtp_ip_blocked` - IP address blocked by allowlist
+- `smtp_rate_limit_exceeded` - Rate limit violations
+- `project_created` - New project creation
+- `project_updated` - Project settings changes
+- `project_deleted` - Project deletion
+- `email_processed` - Email successfully processed
+- `email_quota_exceeded` - Email quota limits exceeded
+- `email_resend_requested` - Manual email resend requests
 
 ## Security Features
 

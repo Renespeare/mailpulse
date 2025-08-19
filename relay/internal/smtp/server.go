@@ -1,8 +1,10 @@
 package smtp
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -286,6 +288,14 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 	project, err := s.authManager.ValidateAPIKey(username, password)
 	if err != nil {
 		log.Printf("Authentication failed for %s from %s: %v", username, s.remoteAddr, err)
+		
+		// Record audit log for failed authentication
+		s.recordAuditLog("smtp_auth_failed", nil, map[string]interface{}{
+			"username": username,
+			"method":   "AUTH PLAIN",
+			"reason":   "invalid_credentials",
+		})
+		
 		return s.sendResponse("535 Authentication failed")
 	}
 	
@@ -294,6 +304,15 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 		clientIP := strings.Split(s.remoteAddr, ":")[0]
 		if !s.authManager.IsIPAllowed(project.ID, clientIP) {
 			log.Printf("IP %s not allowed for project %s", clientIP, project.ID)
+			
+			// Record audit log for IP block
+			s.recordAuditLog("smtp_ip_blocked", &project.ID, map[string]interface{}{
+				"username":  username,
+				"method":    "AUTH PLAIN",
+				"reason":    "ip_not_allowed",
+				"client_ip": clientIP,
+			})
+			
 			return s.sendResponse("535 IP not authorized")
 		}
 	}
@@ -301,6 +320,14 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 	// Check rate limits
 	if err := s.authManager.CheckRateLimit(project.ID); err != nil {
 		log.Printf("Rate limit exceeded for project %s: %v", project.ID, err)
+		
+		// Record audit log for rate limit violation
+		s.recordAuditLog("smtp_rate_limit_exceeded", &project.ID, map[string]interface{}{
+			"username": username,
+			"method":   "AUTH PLAIN",
+			"reason":   "rate_limit_exceeded",
+		})
+		
 		return s.sendResponse("421 Rate limit exceeded")
 	}
 	
@@ -311,6 +338,12 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 	
 	// Record successful auth
 	s.authManager.RecordAuthAttempt(s.remoteAddr, true)
+	
+	// Record audit log for successful authentication
+	s.recordAuditLog("smtp_auth_success", &project.ID, map[string]interface{}{
+		"username": username,
+		"method":   "AUTH PLAIN",
+	})
 	
 	log.Printf("✅ Authentication successful for project %s from %s", project.ID, s.remoteAddr)
 	return s.sendResponse("235 Authentication successful")
@@ -449,6 +482,14 @@ func (s *SMTPSession) processEmail() error {
 	// Check email quotas before processing
 	if err := s.storage.CheckQuotaLimits(s.project.ID); err != nil {
 		log.Printf("Email quota exceeded for project %s: %v", s.project.ID, err)
+		
+		// Record audit log for quota exceeded
+		s.recordAuditLog("email_quota_exceeded", &s.project.ID, map[string]interface{}{
+			"from":    s.mailFrom,
+			"to":      s.rcptTo,
+			"reason":  "quota_limit_exceeded",
+		})
+		
 		return fmt.Errorf("quota exceeded: %w", err)
 	}
 	
@@ -501,6 +542,15 @@ func (s *SMTPSession) processEmail() error {
 	}
 	
 	log.Printf("✅ Email stored in database: %s", messageID)
+	
+	// Record audit log for successful email processing
+	s.recordAuditLog("email_processed", &s.project.ID, map[string]interface{}{
+		"message_id": messageID,
+		"from":       s.mailFrom,
+		"to":         s.rcptTo,
+		"subject":    subject,
+		"size":       len(s.data),
+	})
 	
 	// Only record quota usage AFTER successful database storage
 	if err := s.rateLimiter.RecordEmailSent(s.project.ID); err != nil {
@@ -563,4 +613,52 @@ func (s *SMTPSession) sendResponseRaw(response string) error {
 	log.Printf(">%s SEND: %s", s.remoteAddr, strings.ReplaceAll(response, "\r\n", "\\r\\n"))
 	_, err := s.conn.Write([]byte(response))
 	return err
+}
+
+// recordAuditLog records an audit log entry
+func (s *SMTPSession) recordAuditLog(action string, projectID *string, details map[string]interface{}) {
+	// Generate unique audit log ID
+	auditID := generateAuditID()
+	
+	// Extract client IP from remote address
+	clientIP := s.remoteAddr
+	
+	// Clean up IP address for PostgreSQL INET type
+	// Handle IPv6 format like [::1]:port or IPv4 like 127.0.0.1:port
+	if strings.Contains(clientIP, ":") {
+		if strings.HasPrefix(clientIP, "[") {
+			// IPv6 format [::1]:port
+			if closeBracket := strings.Index(clientIP, "]"); closeBracket != -1 {
+				clientIP = clientIP[1:closeBracket]
+			}
+		} else {
+			// IPv4 format 127.0.0.1:port
+			clientIP = strings.Split(clientIP, ":")[0]
+		}
+	}
+	
+	auditLog := &storage.AuditLog{
+		ID:        auditID,
+		ProjectID: projectID,
+		UserID:    nil, // No user concept in SMTP context
+		Action:    action,
+		IPAddress: clientIP,
+		UserAgent: nil, // SMTP doesn't have user agent
+		Details:   details,
+		CreatedAt: time.Now(),
+	}
+	
+	// Store audit log (non-blocking - don't fail SMTP operations for audit issues)
+	go func() {
+		if err := s.storage.RecordAuditLog(auditLog); err != nil {
+			log.Printf("⚠️  Failed to record audit log: %v", err)
+		}
+	}()
+}
+
+// generateAuditID generates a unique audit log ID
+func generateAuditID() string {
+	bytes := make([]byte, 8)
+	rand.Read(bytes)
+	return "audit_" + hex.EncodeToString(bytes)
 }

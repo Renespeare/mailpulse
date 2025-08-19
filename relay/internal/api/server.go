@@ -74,6 +74,12 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/emails", s.listEmailsHandler).Methods("GET")
 	s.router.HandleFunc("/api/emails", s.handleOptions).Methods("OPTIONS")
 	
+	// Audit Logs
+	s.router.HandleFunc("/api/audit", s.listAuditLogsHandler).Methods("GET")
+	s.router.HandleFunc("/api/audit", s.handleOptions).Methods("OPTIONS")
+	s.router.HandleFunc("/api/audit/{projectId}", s.listProjectAuditLogsHandler).Methods("GET")
+	s.router.HandleFunc("/api/audit/{projectId}", s.handleOptions).Methods("OPTIONS")
+	
 	// CORS middleware
 	s.router.Use(s.corsMiddleware)
 }
@@ -270,6 +276,15 @@ func (s *Server) resendEmailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Record audit log for email resend request
+	s.recordAuditLog(r, "email_resend_requested", &email.ProjectID, map[string]interface{}{
+		"email_id":   emailID,
+		"message_id": email.MessageID,
+		"from":       email.From,
+		"to":         email.To,
+		"subject":    email.Subject,
+	})
+	
 	// Actually forward the email using SMTP
 	go func() {
 		// Simulate processing time
@@ -406,6 +421,14 @@ func (s *Server) createProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Record audit log for project creation
+	s.recordAuditLog(r, "project_created", &project.ID, map[string]interface{}{
+		"project_name":     project.Name,
+		"quota_daily":      project.QuotaDaily,
+		"quota_per_minute": project.QuotaPerMinute,
+		"has_smtp_config":  project.SMTPHost != nil,
+	})
+	
 	// Reload auth manager projects so new project is available immediately
 	if err := s.authManager.ReloadProjects(); err != nil {
 		log.Printf("⚠️  Failed to reload projects in auth manager: %v", err)
@@ -499,6 +522,27 @@ func (s *Server) updateProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Record audit log for project update
+	auditDetails := map[string]interface{}{
+		"project_name": project.Name,
+	}
+	
+	// Add specific fields that were updated
+	for key, value := range updates {
+		switch key {
+		case "name", "description", "status":
+			auditDetails["updated_"+key] = value
+		case "quotaDaily", "quotaPerMinute":
+			auditDetails["updated_"+key] = value
+		case "smtpHost", "smtpPort", "smtpUser":
+			auditDetails["updated_smtp_config"] = true
+		case "smtpPassword":
+			auditDetails["updated_smtp_password"] = true
+		}
+	}
+	
+	s.recordAuditLog(r, "project_updated", &projectID, auditDetails)
+	
 	// Reload auth manager projects to reflect status changes
 	if err := s.authManager.ReloadProjects(); err != nil {
 		log.Printf("⚠️  Failed to reload projects in auth manager: %v", err)
@@ -515,12 +559,26 @@ func (s *Server) deleteProjectHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectID := vars["projectId"]
 	
+	// Get project details before deletion for audit log
+	project, err := s.storage.GetProject(projectID)
+	if err != nil {
+		log.Printf("Failed to get project %s for deletion: %v", projectID, err)
+		http.Error(w, "Project not found", http.StatusNotFound)
+		return
+	}
+	
 	// Delete from storage (soft delete - sets status to 'deleted')
 	if err := s.storage.DeleteProject(projectID); err != nil {
 		log.Printf("Failed to delete project %s: %v", projectID, err)
 		http.Error(w, "Failed to delete project", http.StatusInternalServerError)
 		return
 	}
+	
+	// Record audit log for project deletion
+	s.recordAuditLog(r, "project_deleted", &projectID, map[string]interface{}{
+		"project_name": project.Name,
+		"was_active":   project.Status == "active",
+	})
 	
 	response := map[string]interface{}{
 		"success": true,
@@ -552,6 +610,80 @@ func (s *Server) listEmailsHandler(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(emails)
+}
+
+// listAuditLogsHandler returns all audit logs
+func (s *Server) listAuditLogsHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse pagination parameters
+	limit := 50 // default
+	offset := 0 // default
+	
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := fmt.Sscanf(limitStr, "%d", &limit); l != 1 || err != nil {
+			limit = 50
+		}
+		if limit > 100 {
+			limit = 100 // max limit
+		}
+	}
+	
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if o, err := fmt.Sscanf(offsetStr, "%d", &offset); o != 1 || err != nil {
+			offset = 0
+		}
+	}
+	
+	// Get audit logs from storage
+	logs, err := s.storage.GetAuditLogs(nil, limit, offset)
+	if err != nil {
+		log.Printf("Failed to get audit logs: %v", err)
+		http.Error(w, "Failed to get audit logs", http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(logs)
+}
+
+// listProjectAuditLogsHandler returns audit logs for a specific project
+func (s *Server) listProjectAuditLogsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	projectID := vars["projectId"]
+	
+	if projectID == "" {
+		http.Error(w, "Project ID required", http.StatusBadRequest)
+		return
+	}
+	
+	// Parse pagination parameters
+	limit := 50 // default
+	offset := 0 // default
+	
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := fmt.Sscanf(limitStr, "%d", &limit); l != 1 || err != nil {
+			limit = 50
+		}
+		if limit > 100 {
+			limit = 100 // max limit
+		}
+	}
+	
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if o, err := fmt.Sscanf(offsetStr, "%d", &offset); o != 1 || err != nil {
+			offset = 0
+		}
+	}
+	
+	// Get audit logs for project from storage
+	logs, err := s.storage.GetAuditLogs(&projectID, limit, offset)
+	if err != nil {
+		log.Printf("Failed to get audit logs for project %s: %v", projectID, err)
+		http.Error(w, "Failed to get audit logs", http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(logs)
 }
 
 // handleOptions handles preflight OPTIONS requests
@@ -629,6 +761,64 @@ func (a *StorageAdapter) ListAllProjects() ([]*auth.StorageProject, error) {
 	return authProjects, nil
 }
 
+// recordAuditLog records an audit log entry for API operations
+func (s *Server) recordAuditLog(r *http.Request, action string, projectID *string, details map[string]interface{}) {
+	// Generate unique audit log ID
+	auditID := generateAuditID()
+	
+	// Extract client IP
+	clientIP := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		clientIP = strings.Split(forwarded, ",")[0]
+	}
+	
+	// Clean up IP address for PostgreSQL INET type
+	// Handle IPv6 format like [::1]:port or IPv4 like 127.0.0.1:port
+	if strings.Contains(clientIP, ":") {
+		if strings.HasPrefix(clientIP, "[") {
+			// IPv6 format [::1]:port
+			if closeBracket := strings.Index(clientIP, "]"); closeBracket != -1 {
+				clientIP = clientIP[1:closeBracket]
+			}
+		} else {
+			// IPv4 format 127.0.0.1:port
+			clientIP = strings.Split(clientIP, ":")[0]
+		}
+	}
+	
+	// Extract user agent
+	userAgent := r.Header.Get("User-Agent")
+	var userAgentPtr *string
+	if userAgent != "" {
+		userAgentPtr = &userAgent
+	}
+	
+	auditLog := &storage.AuditLog{
+		ID:        auditID,
+		ProjectID: projectID,
+		UserID:    nil, // No user concept in current API
+		Action:    action,
+		IPAddress: clientIP,
+		UserAgent: userAgentPtr,
+		Details:   details,
+		CreatedAt: time.Now(),
+	}
+	
+	// Store audit log (non-blocking)
+	go func() {
+		if err := s.storage.RecordAuditLog(auditLog); err != nil {
+			log.Printf("⚠️  Failed to record audit log: %v", err)
+		}
+	}()
+}
+
+// generateAuditID generates a unique audit log ID for API operations
+func generateAuditID() string {
+	bytes := make([]byte, 8)
+	rand.Read(bytes)
+	return "audit_" + hex.EncodeToString(bytes)
+}
+
 // Start starts the HTTP API server
 func (s *Server) Start(addr string) error {
 	log.Printf("🌐 Starting HTTP API server on %s", addr)
@@ -636,6 +826,8 @@ func (s *Server) Start(addr string) error {
 	log.Printf("   GET %s/health - Server health check", addr)
 	log.Printf("   GET %s/api/quota/{projectId} - Quota usage", addr)
 	log.Printf("   GET %s/api/emails/stats/{projectId} - Email statistics", addr)
+	log.Printf("   GET %s/api/audit - All audit logs", addr)
+	log.Printf("   GET %s/api/audit/{projectId} - Project audit logs", addr)
 	
 	return http.ListenAndServe(addr, s.router)
 }
