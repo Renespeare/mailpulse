@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 // EmailConfig holds the SMTP configuration
@@ -23,6 +25,11 @@ type EmailConfig struct {
 }
 
 func main() {
+	// Load environment variables from .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables or defaults")
+	}
+
 	// Configuration - update these with your project credentials
 	config := EmailConfig{
 		SMTPHost: "localhost",  // MailPulse relay server

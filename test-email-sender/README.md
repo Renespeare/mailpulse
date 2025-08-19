@@ -13,6 +13,17 @@ A Go script to send emails through your MailPulse SMTP relay server.
 ## Usage
 
 ### Option 1: Environment Variables (Recommended)
+
+**Using .env file:**
+```bash
+# Copy and configure
+cp .env.example .env
+# Edit .env with your credentials
+# Then run:
+go run main.go
+```
+
+**Or using export commands:**
 ```bash
 export MAILPULSE_API_KEY="mp_live_your_api_key_here"
 export MAILPULSE_PASSWORD="your_project_password"
