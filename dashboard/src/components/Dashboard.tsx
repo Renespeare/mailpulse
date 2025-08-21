@@ -204,10 +204,10 @@ function Dashboard() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <div className="text-gray-500">Today's Emails</div>
-                        <div className="font-medium">{stats?.totalEmails || 0}</div>
+                        <div className="font-medium">{quota?.dailyUsed || 0}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Success Rate</div>
+                        <div className="text-gray-500">Overall Success Rate</div>
                         <div className="font-medium">
                           {stats && stats.totalEmails > 0 
                             ? Math.round((stats.sentEmails / stats.totalEmails) * 100) + '%'
@@ -218,13 +218,16 @@ function Dashboard() {
                       <div>
                         <div className="text-gray-500">Daily Quota</div>
                         <div className="font-medium">
-                          {quota?.emailsToday || 0} / {project.quotaDaily}
+                          {quota?.dailyUsed || 0} / {quota?.dailyLimit || project.quotaDaily}
                         </div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Usage</div>
+                        <div className="text-gray-500">Daily Usage</div>
                         <div className="font-medium">
-                          {quota ? Math.round(quota.dailyUsagePercent) : 0}%
+                         {quota.dailyUsagePercent < 1 && quota.dailyUsagePercent > 0 
+                            ? quota.dailyUsagePercent.toFixed(1) 
+                            : Math.round(quota.dailyUsagePercent)
+                          }%
                         </div>
                       </div>
                     </div>

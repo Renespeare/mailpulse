@@ -20,6 +20,7 @@ function Projects() {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({})
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
 
   const fetchData = async () => {
     try {
@@ -71,13 +72,17 @@ function Projects() {
     }
   }
 
-  const handleDeleteProject = async (projectId: string) => {
-    if (!window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteProject = (project: Project) => {
+    setDeletingProject(project)
+  }
+
+  const confirmDeleteProject = async () => {
+    if (!deletingProject) return
+    
     try {
-      await deleteProject(projectId)
+      await deleteProject(deletingProject.id)
       await fetchData()
+      setDeletingProject(null)
     } catch (error) {
       console.error('Failed to delete project:', error)
     }
@@ -278,15 +283,15 @@ function Projects() {
                   {/* Usage Stats */}
                   <div className="grid grid-cols-3 gap-3 mt-6">
                     <div className="text-center">
-                      <div className="text-xl font-bold text-blue-600">{quota?.emailsToday || 0}</div>
+                      <div className="text-xl font-bold text-blue-600">{quota?.dailyUsed || 0}</div>
                       <div className="text-xs text-gray-500">Sent Today</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xl font-bold text-green-600">{project.quotaDaily}</div>
+                      <div className="text-xl font-bold text-green-600">{quota?.dailyLimit || project.quotaDaily}</div>
                       <div className="text-xs text-gray-500">Daily Limit</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-xl font-bold text-purple-600">{project.quotaPerMinute}</div>
+                      <div className="text-xl font-bold text-purple-600">{quota?.minuteLimit || project.quotaPerMinute}</div>
                       <div className="text-xs text-gray-500">Per Minute</div>
                     </div>
                   </div>
@@ -339,7 +344,7 @@ function Projects() {
                           <PencilIcon className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDeleteProject(project.id)}
+                          onClick={() => handleDeleteProject(project)}
                           className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                           title="Delete project"
                         >
@@ -375,6 +380,34 @@ function Projects() {
           initialData={editingProject}
           isEditing={true}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deletingProject && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-white p-6 shadow-lg duration-200 rounded-lg">
+            <div className="flex flex-col space-y-1.5 text-center sm:text-left">
+              <h2 className="text-lg font-semibold text-gray-900">Delete Confirmation</h2>
+              <p className="text-sm text-gray-600">
+                Are you sure you want to delete <strong>"{deletingProject.name}"</strong>? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+              <button
+                onClick={() => setDeletingProject(null)}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 h-10 px-4 py-2 mt-2 sm:mt-0"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteProject}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 bg-red-600 text-white hover:bg-red-700 h-10 px-4 py-2"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

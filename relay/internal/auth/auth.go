@@ -127,25 +127,16 @@ func (m *InMemoryAuthManager) ValidateAPIKey(username, password string) (*Projec
 		if strings.EqualFold(project.APIKey, username) {
 			// If project has a password hash, verify the password
 			if project.APIKeyHash != "" {
-				fmt.Printf("🔍 Verifying password for project %s\n", project.Name)
-				fmt.Printf("🔍 Password provided: %s\n", password)
-				fmt.Printf("🔍 Hash in database: %s\n", project.APIKeyHash)
 				// Convert password to lowercase for comparison (SMTP servers often uppercase)
 				lowercasePassword := strings.ToLower(password)
-				fmt.Printf("🔍 Password lowercased: %s\n", lowercasePassword)
 				err := bcrypt.CompareHashAndPassword([]byte(project.APIKeyHash), []byte(lowercasePassword))
 				if err != nil {
-					fmt.Printf("❌ Password verification failed: %v\n", err)
 					return nil, errors.New("invalid password")
 				}
-				fmt.Printf("✅ Password verification successful\n")
-			} else {
-				fmt.Printf("⚠️  No password hash found for project %s\n", project.Name)
 			}
 			
 			// Check if project is active
 			if project.Status != "active" {
-				fmt.Printf("❌ Project %s is not active (status: %s)\n", project.Name, project.Status)
 				return nil, errors.New("project is not active")
 			}
 			

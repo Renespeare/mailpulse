@@ -3,13 +3,14 @@ const RELAY_API_URL = import.meta.env.VITE_RELAY_API_URL || 'http://localhost:80
 
 export interface QuotaUsage {
   projectId: string
-  emailsThisMinute: number
-  emailsToday: number
-  lastEmailSent?: string
-  quotaPerMinute: number
-  quotaDaily: number
-  minuteUsagePercent: number
+  dailyUsed: number
+  dailyLimit: number
+  dailyRemaining: number
+  minuteUsed: number
+  minuteLimit: number
+  minuteRemaining: number
   dailyUsagePercent: number
+  minuteUsagePercent: number
 }
 
 export interface EmailStats {

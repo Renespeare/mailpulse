@@ -115,10 +115,11 @@ mailpulse/
 ├── relay/                 # Go SMTP relay
 │   ├── cmd/               # Main application
 │   └── internal/          # Core packages
+│       ├── api/           # HTTP API server (modular)
 │       ├── auth/          # Authentication
-│       ├── storage/       # Database operations
 │       ├── security/      # Rate limiting
-│       └── smtp/          # SMTP server
+│       ├── smtp/          # SMTP server
+│       └── storage/       # PostgreSQL integration (modular)
 ├── dashboard/             # React + Vite dashboard
 │   ├── src/               # Source files and components
 ├── docker/                # Docker configurations

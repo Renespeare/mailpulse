@@ -153,10 +153,9 @@ func (s *SMTPSession) handle() {
 		}
 		
 		command := strings.TrimSpace(string(buffer[:n]))
-		log.Printf("<%s RECV: %s", s.remoteAddr, command)
 		
 		if err := s.processCommand(command); err != nil {
-			log.Printf("Error processing command from %s: %v", s.remoteAddr, err)
+			// log.Printf("Error processing command from %s: %v", s.remoteAddr, err)
 			s.sendResponse("500 Command error")
 			return
 		}
@@ -255,10 +254,6 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 		return s.sendResponse("535 Authentication failed")
 	}
 	
-	log.Printf("🔍 Debug: Full command: %q", fullCommand)
-	log.Printf("🔍 Debug: Command parts: %q", parts)
-	log.Printf("🔍 Debug: Base64 part: %q", parts[2])
-	
 	// Decode base64 credentials
 	authData, err := base64.StdEncoding.DecodeString(parts[2])
 	if err != nil {
@@ -266,13 +261,8 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 		return s.sendResponse("535 Authentication failed")
 	}
 	
-	// Debug: Show raw bytes
-	log.Printf("🔍 Debug: Raw auth bytes: %x", authData)
-	log.Printf("🔍 Debug: Raw auth string: %q", string(authData))
-	
 	// AUTH PLAIN format: \0username\0password
 	authParts := strings.Split(string(authData), "\x00")
-	log.Printf("🔍 Debug: Auth parts: %q", authParts)
 	
 	if len(authParts) != 3 {
 		log.Printf("Invalid auth format from %s, expected 3 parts, got %d: %q", s.remoteAddr, len(authParts), authParts)
@@ -281,8 +271,6 @@ func (s *SMTPSession) handleAuthPlain(parts []string, fullCommand string) error 
 	
 	username := authParts[1] // authParts[0] is empty (authorization identity)
 	password := authParts[2]
-	
-	log.Printf("🔍 Debug: Extracted username='%s', password='%s'", username, password)
 	
 	// Validate credentials
 	project, err := s.authManager.ValidateAPIKey(username, password)
@@ -603,14 +591,12 @@ func (s *SMTPSession) handleReset() error {
 
 // sendResponse sends an SMTP response
 func (s *SMTPSession) sendResponse(response string) error {
-	log.Printf(">%s SEND: %s", s.remoteAddr, response)
 	_, err := s.conn.Write([]byte(response + "\r\n"))
 	return err
 }
 
 // sendResponseRaw sends a raw SMTP response
 func (s *SMTPSession) sendResponseRaw(response string) error {
-	log.Printf(">%s SEND: %s", s.remoteAddr, strings.ReplaceAll(response, "\r\n", "\\r\\n"))
 	_, err := s.conn.Write([]byte(response))
 	return err
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/Renespeare/mailpulse/relay/internal/api"
 	"github.com/Renespeare/mailpulse/relay/internal/auth"
@@ -50,32 +49,6 @@ func main() {
 		log.Printf("⚠️  Could not load projects from database: %v", err)
 	}
 	
-	// Create a test project for development (fallback)
-	apiKey, apiKeyHash, err := authManager.GenerateAPIKey("mp_test")
-	if err != nil {
-		log.Fatalf("Failed to generate API key: %v", err)
-	}
-	
-	testProject := &auth.Project{
-		ID:             "test-project-1",
-		Name:           "Test Project",
-		APIKey:         apiKey,
-		APIKeyHash:     apiKeyHash,
-		Status:         "active",
-		SMTPHost:       "smtp.gmail.com",
-		SMTPPort:       587,
-		SMTPUsername:   "test@example.com",
-		QuotaDaily:     500,
-		QuotaPerMinute: 10,
-		RequireIPAllow: false,
-		UserID:         "test-user-1",
-		CreatedAt:      time.Now(),
-	}
-	
-	authManager.AddProject(testProject)
-	
-	log.Printf("🔑 Test API Key generated: %s", apiKey)
-	log.Printf("📝 Use this for testing: AUTH PLAIN %s test-password", apiKey)
 	
 	// Get ports
 	smtpPort := os.Getenv("SMTP_PORT")

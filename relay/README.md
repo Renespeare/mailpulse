@@ -219,12 +219,11 @@ relay/
 ├── cmd/
 │   └── main.go              # Application entry point
 ├── internal/
-│   ├── api/                 # HTTP API server
+│   ├── api/                 # HTTP API server (modular)
 │   ├── auth/                # Authentication & authorization
-│   ├── smtp/                # SMTP server implementation
-│   ├── storage/             # PostgreSQL integration
 │   ├── security/            # Rate limiting & security
-│   └── queue/               # Email retry queue
+│   ├── smtp/                # SMTP server implementation
+│   └── storage/             # PostgreSQL integration (modular)
 ├── go.mod
 └── README.md
 ```
