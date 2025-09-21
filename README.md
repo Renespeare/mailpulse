@@ -37,7 +37,7 @@ docker-compose up -d
 ```
 
 ### 3. Access Dashboard
-Visit http://localhost:3000 and start creating projects.
+Visit http://localhost:3000, sign in with your admin credentials (configured in .env), and start creating projects.
 
 ## Architecture
 
@@ -74,13 +74,14 @@ Visit http://localhost:3000 and start creating projects.
 
 ### Dashboard (`dashboard/`)
 - **React 19** with TypeScript and Vite
+- **Admin authentication** with JWT tokens
 - **Direct API integration** for database operations
-- **Built-in authentication** for secure access
 - **Tailwind CSS v4** with modern components
 - **Real-time** email monitoring and analytics
 
 ### Security Features
-- **API Key Authentication** - bcrypt-hashed API keys
+- **Dashboard Authentication** - JWT-based admin access
+- **API Key Authentication** - bcrypt-hashed SMTP API keys
 - **Rate Limiting** - In-memory per-project quotas
 - **Audit Logging** - Comprehensive security event tracking
 - **Encryption** - AES-256 for sensitive data
@@ -101,6 +102,11 @@ DATABASE_URL=postgres://user:pass@localhost:5432/mailpulse
 
 # Security
 ENCRYPTION_KEY=your-32-character-encryption-key
+
+# Admin Authentication
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-secure-admin-password
+JWT_SECRET=your-32-character-jwt-secret
 
 # SMTP
 SMTP_PORT=2525

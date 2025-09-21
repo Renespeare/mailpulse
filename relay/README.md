@@ -84,13 +84,33 @@ For complete examples of sending email, see [docs/SENDING_EMAIL.md](../docs/SEND
 
 ## API Endpoints
 
+### Public Endpoints (No Authentication Required)
+
 #### Health Check
 - `GET /health` - Server health status
 
-#### Email Management
-- `GET /api/emails` - List emails with pagination (optional `?project=id` filter)
-- `GET /api/emails/stats/{projectId}` - Email statistics for a project
-- `POST /api/emails/{emailId}/resend` - Resend failed email
+#### Admin Authentication
+- `POST /api/admin/login` - Authenticate admin user
+- `POST /api/admin/logout` - Logout admin user  
+- `GET /api/admin/verify` - Verify admin token validity
+
+**Authentication Example:**
+```bash
+# Login to get JWT token
+curl -X POST http://localhost:8080/api/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"your-password"}'
+
+# Response: {"token":"eyJ...", "expiresAt":1640995200}
+
+# Use token for protected endpoints
+curl -H "Authorization: Bearer eyJ..." \
+  http://localhost:8080/api/projects
+```
+
+### Protected Endpoints (Require Admin Authentication)
+
+**All endpoints below require `Authorization: Bearer <jwt-token>` header**
 
 #### Project Management
 - `GET /api/projects` - List all projects
@@ -98,6 +118,11 @@ For complete examples of sending email, see [docs/SENDING_EMAIL.md](../docs/SEND
 - `GET /api/projects/{projectId}` - Get specific project
 - `PATCH /api/projects/{projectId}` - Update project settings
 - `DELETE /api/projects/{projectId}` - Delete project (soft delete)
+
+#### Email Management
+- `GET /api/emails` - List emails with pagination (optional `?project=id` filter)
+- `GET /api/emails/stats/{projectId}` - Email statistics for a project
+- `POST /api/emails/{emailId}/resend` - Resend failed email
 
 #### Quota Monitoring
 - `GET /api/quota/{projectId}` - Real-time quota usage and limits

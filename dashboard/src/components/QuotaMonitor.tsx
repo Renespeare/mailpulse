@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { getQuotaUsage } from '../lib/api'
 
 interface QuotaData {
   projectId: string
@@ -27,13 +28,14 @@ function QuotaMonitor({ projectId, refreshTrigger }: QuotaMonitorProps) {
     if (!projectId) return
     
     try {
-      const response = await fetch(`http://localhost:8080/api/quota/${projectId}`)
-      if (!response.ok) {
+      setIsLoading(true)
+      const data = await getQuotaUsage(projectId)
+      if (data) {
+        setQuotaData(data)
+        setError(null)
+      } else {
         throw new Error('Failed to fetch quota data')
       }
-      const data = await response.json()
-      setQuotaData(data)
-      setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {

@@ -6,7 +6,8 @@ import {
   CogIcon,
   ServerIcon,
   Bars3Icon,
-  ChevronLeftIcon
+  ChevronLeftIcon,
+  ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
 import { 
   HomeIcon as HomeIconSolid, 
@@ -14,6 +15,9 @@ import {
   CogIcon as CogIconSolid
 } from '@heroicons/react/24/solid'
 import { getRelayHealth } from './lib/api'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ToastProvider, useToast } from './contexts/ToastContext'
+import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './components/Dashboard'
 import EmailActivity from './components/EmailActivity'
 import Projects from './components/Projects'
@@ -33,14 +37,35 @@ interface NavigationItem {
 
 function App() {
   return (
-    <Router>
-      <AppLayout />
-    </Router>
+    <ToastProvider>
+      <AuthWrapper>
+        <Router>
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        </Router>
+      </AuthWrapper>
+    </ToastProvider>
+  )
+}
+
+function AuthWrapper({ children }: { children: React.ReactNode }) {
+  const { warning } = useToast()
+  
+  const handleSessionExpired = () => {
+    warning('Session Expired', 'Your session has expired. Please sign in again.')
+  }
+  
+  return (
+    <AuthProvider onSessionExpired={handleSessionExpired}>
+      {children}
+    </AuthProvider>
   )
 }
 
 function AppLayout() {
   const location = useLocation()
+  const { user, logout } = useAuth()
   const [relayHealth, setRelayHealth] = useState<RelayHealth | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     // Remember sidebar state, but default to collapsed on mobile
@@ -200,6 +225,23 @@ function AppLayout() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* User & Logout */}
+        <div className={`${sidebarCollapsed ? 'p-2' : 'p-4'} border-t border-gray-100`}>
+          {!sidebarCollapsed && user && (
+            <div className="mb-3 text-xs text-gray-500">
+              Signed in as <span className="font-medium text-gray-700">{user.username}</span>
+            </div>
+          )}
+          <button
+            onClick={logout}
+            className={`w-full flex items-center ${sidebarCollapsed ? 'justify-center px-3 py-3' : 'px-4 py-2'} text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors`}
+            title={sidebarCollapsed ? 'Sign out' : undefined}
+          >
+            <ArrowRightOnRectangleIcon className="w-5 h-5 flex-shrink-0" />
+            {!sidebarCollapsed && <span className="ml-3">Sign out</span>}
+          </button>
         </div>
       </div>
 

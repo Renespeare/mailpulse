@@ -40,40 +40,52 @@ func NewServer(authManager auth.AuthManager, storage storage.Storage, rateLimite
 
 // setupRoutes configures API routes
 func (s *Server) setupRoutes() {
+	// Public routes (no authentication required)
+	
 	// Health check
 	s.router.HandleFunc("/health", s.healthHandler).Methods("GET")
 	s.router.HandleFunc("/health", s.handleOptions).Methods("OPTIONS")
 	
+	// Admin authentication routes
+	s.router.HandleFunc("/api/admin/login", s.handleAdminLogin).Methods("POST")
+	s.router.HandleFunc("/api/admin/login", s.handleOptions).Methods("OPTIONS")
+	s.router.HandleFunc("/api/admin/logout", s.handleAdminLogout).Methods("POST")
+	s.router.HandleFunc("/api/admin/logout", s.handleOptions).Methods("OPTIONS")
+	s.router.HandleFunc("/api/admin/verify", s.handleAdminVerify).Methods("GET")
+	s.router.HandleFunc("/api/admin/verify", s.handleOptions).Methods("OPTIONS")
+	
+	// Protected routes (require admin authentication)
+	
 	// Quota usage
-	s.router.HandleFunc("/api/quota/{projectId}", s.quotaUsageHandler).Methods("GET")
+	s.router.HandleFunc("/api/quota/{projectId}", s.adminAuthMiddleware(s.quotaUsageHandler)).Methods("GET")
 	s.router.HandleFunc("/api/quota/{projectId}", s.handleOptions).Methods("OPTIONS")
 	
 	// Email stats  
-	s.router.HandleFunc("/api/emails/stats/{projectId}", s.emailStatsHandler).Methods("GET")
+	s.router.HandleFunc("/api/emails/stats/{projectId}", s.adminAuthMiddleware(s.emailStatsHandler)).Methods("GET")
 	s.router.HandleFunc("/api/emails/stats/{projectId}", s.handleOptions).Methods("OPTIONS")
 	
 	// Email resend
-	s.router.HandleFunc("/api/emails/{emailId}/resend", s.resendEmailHandler).Methods("POST")
+	s.router.HandleFunc("/api/emails/{emailId}/resend", s.adminAuthMiddleware(s.resendEmailHandler)).Methods("POST")
 	s.router.HandleFunc("/api/emails/{emailId}/resend", s.handleOptions).Methods("OPTIONS")
 	
 	// Projects
-	s.router.HandleFunc("/api/projects", s.listProjectsHandler).Methods("GET")
-	s.router.HandleFunc("/api/projects", s.createProjectHandler).Methods("POST")
+	s.router.HandleFunc("/api/projects", s.adminAuthMiddleware(s.listProjectsHandler)).Methods("GET")
+	s.router.HandleFunc("/api/projects", s.adminAuthMiddleware(s.createProjectHandler)).Methods("POST")
 	s.router.HandleFunc("/api/projects", s.handleOptions).Methods("OPTIONS")
 	
-	s.router.HandleFunc("/api/projects/{projectId}", s.getProjectHandler).Methods("GET")
-	s.router.HandleFunc("/api/projects/{projectId}", s.updateProjectHandler).Methods("PATCH")
-	s.router.HandleFunc("/api/projects/{projectId}", s.deleteProjectHandler).Methods("DELETE")
+	s.router.HandleFunc("/api/projects/{projectId}", s.adminAuthMiddleware(s.getProjectHandler)).Methods("GET")
+	s.router.HandleFunc("/api/projects/{projectId}", s.adminAuthMiddleware(s.updateProjectHandler)).Methods("PATCH")
+	s.router.HandleFunc("/api/projects/{projectId}", s.adminAuthMiddleware(s.deleteProjectHandler)).Methods("DELETE")
 	s.router.HandleFunc("/api/projects/{projectId}", s.handleOptions).Methods("OPTIONS")
 	
 	// Emails
-	s.router.HandleFunc("/api/emails", s.listEmailsHandler).Methods("GET")
+	s.router.HandleFunc("/api/emails", s.adminAuthMiddleware(s.listEmailsHandler)).Methods("GET")
 	s.router.HandleFunc("/api/emails", s.handleOptions).Methods("OPTIONS")
 	
 	// Audit Logs
-	s.router.HandleFunc("/api/audit", s.listAuditLogsHandler).Methods("GET")
+	s.router.HandleFunc("/api/audit", s.adminAuthMiddleware(s.listAuditLogsHandler)).Methods("GET")
 	s.router.HandleFunc("/api/audit", s.handleOptions).Methods("OPTIONS")
-	s.router.HandleFunc("/api/audit/{projectId}", s.listProjectAuditLogsHandler).Methods("GET")
+	s.router.HandleFunc("/api/audit/{projectId}", s.adminAuthMiddleware(s.listProjectAuditLogsHandler)).Methods("GET")
 	s.router.HandleFunc("/api/audit/{projectId}", s.handleOptions).Methods("OPTIONS")
 	
 	// CORS middleware
@@ -205,9 +217,20 @@ func generateAuditID() string {
 func (s *Server) Start(addr string) error {
 	log.Printf("🌐 Starting HTTP API server on %s", addr)
 	log.Printf("📊 API Endpoints:")
-	log.Printf("   GET %s/health - Server health check", addr)
+	log.Printf("   GET %s/health - Server health check (public)", addr)
+	log.Printf("   POST %s/api/admin/login - Admin authentication (public)", addr)
+	log.Printf("   POST %s/api/admin/logout - Admin logout (public)", addr)
+	log.Printf("   GET %s/api/admin/verify - Verify admin token (public)", addr)
+	log.Printf("   🔐 Protected endpoints (require admin authentication):")
+	log.Printf("   GET %s/api/projects - List all projects", addr)
+	log.Printf("   POST %s/api/projects - Create new project", addr)
+	log.Printf("   GET %s/api/projects/{projectId} - Get specific project", addr)
+	log.Printf("   PATCH %s/api/projects/{projectId} - Update project", addr)
+	log.Printf("   DELETE %s/api/projects/{projectId} - Delete project", addr)
 	log.Printf("   GET %s/api/quota/{projectId} - Quota usage", addr)
+	log.Printf("   GET %s/api/emails - List all emails", addr)
 	log.Printf("   GET %s/api/emails/stats/{projectId} - Email statistics", addr)
+	log.Printf("   POST %s/api/emails/{emailId}/resend - Resend email", addr)
 	log.Printf("   GET %s/api/audit - All audit logs", addr)
 	log.Printf("   GET %s/api/audit/{projectId} - Project audit logs", addr)
 	

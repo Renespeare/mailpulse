@@ -1,5 +1,20 @@
 // API client for MailPulse relay
+import { authService } from './auth'
+
 const RELAY_API_URL = import.meta.env.VITE_RELAY_API_URL || 'http://localhost:8080'
+
+// Helper function to get headers with authentication
+function getHeaders(includeAuth = true): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  
+  if (includeAuth) {
+    Object.assign(headers, authService.getAuthHeader())
+  }
+  
+  return headers
+}
 
 export interface QuotaUsage {
   projectId: string
@@ -60,7 +75,9 @@ export interface Email {
 
 export async function getQuotaUsage(projectId: string): Promise<QuotaUsage | null> {
   try {
-    const response = await fetch(`${RELAY_API_URL}/api/quota/${projectId}`)
+    const response = await fetch(`${RELAY_API_URL}/api/quota/${projectId}`, {
+      headers: getHeaders()
+    })
     if (!response.ok) {
       console.error('Failed to fetch quota usage:', response.statusText)
       return null
@@ -74,7 +91,9 @@ export async function getQuotaUsage(projectId: string): Promise<QuotaUsage | nul
 
 export async function getEmailStats(projectId: string): Promise<EmailStats | null> {
   try {
-    const response = await fetch(`${RELAY_API_URL}/api/emails/stats/${projectId}`)
+    const response = await fetch(`${RELAY_API_URL}/api/emails/stats/${projectId}`, {
+      headers: getHeaders()
+    })
     if (!response.ok) {
       console.error('Failed to fetch email stats:', response.statusText)
       return null
@@ -88,7 +107,9 @@ export async function getEmailStats(projectId: string): Promise<EmailStats | nul
 
 export async function getRelayHealth(): Promise<any> {
   try {
-    const response = await fetch(`${RELAY_API_URL}/health`)
+    const response = await fetch(`${RELAY_API_URL}/health`, {
+      headers: getHeaders(false) // Health check doesn't need auth
+    })
     if (!response.ok) {
       return { status: 'unhealthy', message: 'Relay not responding' }
     }
@@ -102,9 +123,7 @@ export async function resendEmail(emailId: string): Promise<{ success: boolean; 
   try {
     const response = await fetch(`${RELAY_API_URL}/api/emails/${emailId}/resend`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
     })
     
     if (!response.ok) {
@@ -122,7 +141,9 @@ export async function resendEmail(emailId: string): Promise<{ success: boolean; 
 
 export async function getProjects(): Promise<Project[]> {
   try {
-    const response = await fetch(`${RELAY_API_URL}/api/projects`)
+    const response = await fetch(`${RELAY_API_URL}/api/projects`, {
+      headers: getHeaders()
+    })
     if (!response.ok) {
       console.error('Failed to fetch projects:', response.statusText)
       return []
@@ -161,9 +182,7 @@ export async function createProject(projectData: Partial<Project>): Promise<{ su
   try {
     const response = await fetch(`${RELAY_API_URL}/api/projects`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify(projectData),
     })
     
@@ -184,6 +203,7 @@ export async function deleteProject(projectId: string): Promise<{ success: boole
   try {
     const response = await fetch(`${RELAY_API_URL}/api/projects/${projectId}`, {
       method: 'DELETE',
+      headers: getHeaders(),
     })
     
     if (!response.ok) {
@@ -202,9 +222,7 @@ export async function updateProject(projectId: string, updates: Partial<Project>
   try {
     const response = await fetch(`${RELAY_API_URL}/api/projects/${projectId}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getHeaders(),
       body: JSON.stringify(updates),
     })
     
@@ -227,7 +245,9 @@ export async function getEmails(projectFilter?: string): Promise<Email[]> {
       ? `${RELAY_API_URL}/api/emails?project=${encodeURIComponent(projectFilter)}`
       : `${RELAY_API_URL}/api/emails`
     
-    const response = await fetch(url)
+    const response = await fetch(url, {
+      headers: getHeaders()
+    })
     if (!response.ok) {
       console.error('Failed to fetch emails:', response.statusText)
       return []
