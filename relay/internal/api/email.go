@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Renespeare/mailpulse/relay/internal/storage"
@@ -32,6 +33,49 @@ func (s *Server) emailStatsHandler(w http.ResponseWriter, r *http.Request) {
 	// Calculate statistics
 	stats := map[string]interface{}{
 		"projectId":     projectID,
+		"totalEmails":   len(emails),
+		"sentEmails":    0,
+		"failedEmails":  0,
+		"queuedEmails":  0,
+		"totalSize":     0,
+	}
+	
+	for _, email := range emails {
+		switch email.Status {
+		case "delivered", "processed":
+			stats["sentEmails"] = stats["sentEmails"].(int) + 1
+		case "failed":
+			stats["failedEmails"] = stats["failedEmails"].(int) + 1
+		case "queued":
+			stats["queuedEmails"] = stats["queuedEmails"].(int) + 1
+		}
+		stats["totalSize"] = stats["totalSize"].(int) + email.Size
+	}
+	
+	// Calculate success rate
+	totalProcessed := stats["sentEmails"].(int) + stats["failedEmails"].(int)
+	successRate := 0.0
+	if totalProcessed > 0 {
+		successRate = float64(stats["sentEmails"].(int)) / float64(totalProcessed) * 100
+	}
+	stats["successRate"] = successRate
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
+}
+
+// allEmailStatsHandler returns email statistics across all projects
+func (s *Server) allEmailStatsHandler(w http.ResponseWriter, r *http.Request) {
+	// Get emails for all projects
+	emails, err := s.storage.ListAllEmails(10000, 0) // Get up to 10000 recent emails for stats
+	if err != nil {
+		log.Printf("Failed to get all emails for stats: %v", err)
+		http.Error(w, "Failed to get email statistics", http.StatusInternalServerError)
+		return
+	}
+	
+	// Calculate statistics
+	stats := map[string]interface{}{
 		"totalEmails":   len(emails),
 		"sentEmails":    0,
 		"failedEmails":  0,
@@ -138,25 +182,55 @@ func (s *Server) resendEmailHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// listEmailsHandler returns emails (with optional project filter)
+// listEmailsHandler returns emails with pagination, search, and status filtering
 func (s *Server) listEmailsHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
 	projectID := r.URL.Query().Get("project")
+	searchQuery := r.URL.Query().Get("search")
+	statusFilter := r.URL.Query().Get("status")
 	
+	// Parse pagination parameters
+	limit := 20 // default page size
+	offset := 0 // default offset
+	
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+	
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+	
+	// Get emails with search, status filtering, and pagination
 	var emails []*storage.Email
+	var totalCount int
 	var err error
 	
 	if projectID != "" {
-		emails, err = s.storage.ListEmails(projectID, 50, 0)
+		emails, totalCount, err = s.storage.SearchEmailsWithStatus(projectID, searchQuery, statusFilter, limit, offset)
 	} else {
-		emails, err = s.storage.ListAllEmails(50, 0)
+		emails, totalCount, err = s.storage.SearchAllEmailsWithStatus(searchQuery, statusFilter, limit, offset)
 	}
 	
 	if err != nil {
-		log.Printf("Failed to list emails: %v", err)
-		http.Error(w, "Failed to list emails", http.StatusInternalServerError)
+		log.Printf("Failed to search emails: %v", err)
+		http.Error(w, "Failed to search emails", http.StatusInternalServerError)
 		return
 	}
 	
+	// Create paginated response
+	response := map[string]interface{}{
+		"emails":     emails,
+		"totalCount": totalCount,
+		"limit":      limit,
+		"offset":     offset,
+		"hasMore":    offset+len(emails) < totalCount,
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(emails)
+	json.NewEncoder(w).Encode(response)
 }

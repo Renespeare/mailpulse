@@ -72,6 +72,10 @@ type Storage interface {
 	GetEmail(id string) (*Email, error)
 	ListEmails(projectID string, limit, offset int) ([]*Email, error)
 	ListAllEmails(limit, offset int) ([]*Email, error)
+	SearchEmails(projectID string, searchQuery string, limit, offset int) ([]*Email, int, error)
+	SearchAllEmails(searchQuery string, limit, offset int) ([]*Email, int, error)
+	SearchEmailsWithStatus(projectID string, searchQuery string, statusFilter string, limit, offset int) ([]*Email, int, error)
+	SearchAllEmailsWithStatus(searchQuery string, statusFilter string, limit, offset int) ([]*Email, int, error)
 	UpdateEmailStatus(id string, status string, error *string) error
 	
 	// Project operations

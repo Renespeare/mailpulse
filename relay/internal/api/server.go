@@ -61,6 +61,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/quota/{projectId}", s.handleOptions).Methods("OPTIONS")
 	
 	// Email stats  
+	s.router.HandleFunc("/api/emails/stats", s.adminAuthMiddleware(s.allEmailStatsHandler)).Methods("GET")
+	s.router.HandleFunc("/api/emails/stats", s.handleOptions).Methods("OPTIONS")
 	s.router.HandleFunc("/api/emails/stats/{projectId}", s.adminAuthMiddleware(s.emailStatsHandler)).Methods("GET")
 	s.router.HandleFunc("/api/emails/stats/{projectId}", s.handleOptions).Methods("OPTIONS")
 	
@@ -229,6 +231,7 @@ func (s *Server) Start(addr string) error {
 	log.Printf("   DELETE %s/api/projects/{projectId} - Delete project", addr)
 	log.Printf("   GET %s/api/quota/{projectId} - Quota usage", addr)
 	log.Printf("   GET %s/api/emails - List all emails", addr)
+	log.Printf("   GET %s/api/emails/stats - All email statistics", addr)
 	log.Printf("   GET %s/api/emails/stats/{projectId} - Email statistics", addr)
 	log.Printf("   POST %s/api/emails/{emailId}/resend - Resend email", addr)
 	log.Printf("   GET %s/api/audit - All audit logs", addr)

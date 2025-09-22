@@ -105,6 +105,22 @@ export async function getEmailStats(projectId: string): Promise<EmailStats | nul
   }
 }
 
+export async function getAllEmailStats(): Promise<EmailStats | null> {
+  try {
+    const response = await fetch(`${RELAY_API_URL}/api/emails/stats`, {
+      headers: getHeaders()
+    })
+    if (!response.ok) {
+      console.error('Failed to fetch all email stats:', response.statusText)
+      return null
+    }
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching all email stats:', error)
+    return null
+  }
+}
+
 export async function getRelayHealth(): Promise<any> {
   try {
     const response = await fetch(`${RELAY_API_URL}/health`, {
@@ -239,28 +255,48 @@ export async function updateProject(projectId: string, updates: Partial<Project>
   }
 }
 
-export async function getEmails(projectFilter?: string): Promise<Email[]> {
+export interface EmailsResponse {
+  emails: Email[]
+  totalCount: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
+export async function getEmails(
+  projectFilter?: string, 
+  searchQuery?: string, 
+  limit: number = 20, 
+  offset: number = 0,
+  statusFilter?: string
+): Promise<EmailsResponse> {
   try {
-    const url = projectFilter 
-      ? `${RELAY_API_URL}/api/emails?project=${encodeURIComponent(projectFilter)}`
-      : `${RELAY_API_URL}/api/emails`
+    const params = new URLSearchParams()
+    if (projectFilter) params.set('project', projectFilter)
+    if (searchQuery) params.set('search', searchQuery)
+    if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
+    params.set('limit', limit.toString())
+    params.set('offset', offset.toString())
+    
+    const url = `${RELAY_API_URL}/api/emails?${params.toString()}`
     
     const response = await fetch(url, {
       headers: getHeaders()
     })
     if (!response.ok) {
       console.error('Failed to fetch emails:', response.statusText)
-      return []
+      return { emails: [], totalCount: 0, limit, offset, hasMore: false }
     }
-    const emails = await response.json()
     
-    // Handle null response from API
-    if (!emails || !Array.isArray(emails)) {
-      return []
+    const data = await response.json()
+    
+    // Handle null/invalid response from API
+    if (!data || !Array.isArray(data.emails)) {
+      return { emails: [], totalCount: 0, limit, offset, hasMore: false }
     }
     
     // Transform Go API field names to match dashboard expectations
-    return emails.map((email: any) => ({
+    const transformedEmails = data.emails.map((email: any) => ({
       id: email.ID,
       messageId: email.MessageID,
       projectId: email.ProjectID,
@@ -277,8 +313,16 @@ export async function getEmails(projectFilter?: string): Promise<Email[]> {
       clickedAt: email.ClickedAt ? new Date(email.ClickedAt) : null,
       metadata: email.Metadata
     }))
+    
+    return {
+      emails: transformedEmails,
+      totalCount: data.totalCount || 0,
+      limit: data.limit || limit,
+      offset: data.offset || offset,
+      hasMore: data.hasMore || false
+    }
   } catch (error) {
     console.error('Error fetching emails:', error)
-    return []
+    return { emails: [], totalCount: 0, limit, offset, hasMore: false }
   }
 }

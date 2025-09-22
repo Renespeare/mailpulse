@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { 
   MagnifyingGlassIcon,
   FunnelIcon,
   EyeIcon,
   ArrowPathIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline'
-import { getEmails, getProjects, resendEmail, type Email, type Project } from '../lib/api'
+import { getEmails, getProjects, resendEmail, getEmailStats, getAllEmailStats, type Email, type Project, type EmailsResponse, type EmailStats } from '../lib/api'
 import EmailDetailModal from './EmailDetailModal'
 import QuotaMonitor from './QuotaMonitor'
 
@@ -17,43 +20,135 @@ function EmailActivity() {
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
   const [showEmailDetail, setShowEmailDetail] = useState(false)
   const [projectFilter, setProjectFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
   const [resendingEmail, setResendingEmail] = useState<string | null>(null)
   const [showQuotaMonitor, setShowQuotaMonitor] = useState(false)
   const [quotaProjectId, setQuotaProjectId] = useState<string | null>(null)
   const [quotaRefreshTrigger, setQuotaRefreshTrigger] = useState(0)
-
-  const fetchEmails = async () => {
-    try {
-      const filter = projectFilter === 'all' ? undefined : projectFilter
-      const data = await getEmails(filter)
-      setEmails(data || [])
-    } catch (error) {
-      console.error('Failed to fetch emails:', error)
-      setEmails([])
-    }
-  }
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [limit] = useState(20)
+  const [refreshingEmails, setRefreshingEmails] = useState(false)
+  const [emailStats, setEmailStats] = useState<EmailStats | null>(null)
+  const [loadingStats, setLoadingStats] = useState(false)
+  
+  // Ref for search input to maintain focus
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const handleRefresh = async () => {
-    await fetchEmails()
-    // Trigger quota refresh for the current project
-    if (quotaProjectId) {
-      setQuotaRefreshTrigger(prev => prev + 1)
+    // Store current focus state
+    const wasSearchFocused = document.activeElement === searchInputRef.current
+    
+    setRefreshingEmails(true)
+    
+    try {
+      // Refresh both emails and stats
+      await Promise.all([
+        fetchEmailsData(searchQuery, currentPage),
+        fetchEmailStats()
+      ])
+      
+      // Trigger quota refresh for the current project
+      if (quotaProjectId) {
+        setQuotaRefreshTrigger(prev => prev + 1)
+      }
+    } catch (error) {
+      console.error('Failed to refresh emails:', error)
+    } finally {
+      setRefreshingEmails(false)
+      
+      // Restore focus if search was focused
+      if (wasSearchFocused && searchInputRef.current) {
+        setTimeout(() => {
+          searchInputRef.current?.focus()
+        }, 50)
+      }
     }
   }
 
+  // Debounce search query only
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setDebouncedSearchQuery(searchQuery)
+      setCurrentPage(1) // Reset to first page when search changes
+      
+      // Only fetch if this is a search change, not filter change
+      if (!loading && searchQuery !== debouncedSearchQuery) {
+        await fetchEmailsData(searchQuery)
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery]) // Only depend on searchQuery
+
+  // Helper function to fetch stats for current project filter
+  const fetchEmailStats = async () => {
+    setLoadingStats(true)
+    
+    try {
+      if (projectFilter === 'all') {
+        // Call all projects stats API
+        const stats = await getAllEmailStats()
+        setEmailStats(stats)
+      } else {
+        // Call single project stats API
+        const stats = await getEmailStats(projectFilter)
+        setEmailStats(stats)
+      }
+    } catch (error) {
+      console.error('Failed to fetch email stats:', error)
+      setEmailStats(null)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
+
+  // Helper function to fetch emails with current filters
+  const fetchEmailsData = async (search: string = searchQuery, page: number = 1) => {
+    try {
+      const filter = projectFilter === 'all' ? undefined : projectFilter
+      const status = statusFilter === 'all' ? undefined : statusFilter
+      const offset = (page - 1) * limit
+      const data: EmailsResponse = await getEmails(filter, search, limit, offset, status)
+      
+      setEmails(data.emails || [])
+      setTotalCount(data.totalCount || 0)
+      setHasMore(data.hasMore || false)
+    } catch (error) {
+      console.error('Failed to fetch emails:', error)
+    }
+  }
+
+  // Initial data loading and filter changes (project/status filters)
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const [emailsData, projectsData] = await Promise.all([
-          getEmails(projectFilter === 'all' ? undefined : projectFilter),
-          getProjects()
-        ])
-        // Batch state updates to prevent multiple renders
-        setEmails(emailsData || [])
+        // Always fetch projects to ensure we have the latest
+        const projectsData = await getProjects()
         setProjects(projectsData || [])
-        setLoading(false) // Move setLoading(false) here to batch with other updates
+        
+        // Reset pagination when filters change
+        setCurrentPage(1)
+        
+        // Fetch emails and stats for the new filters
+        const filter = projectFilter === 'all' ? undefined : projectFilter
+        const status = statusFilter === 'all' ? undefined : statusFilter
+        
+        const [emailsData] = await Promise.all([
+          getEmails(filter, searchQuery, limit, 0, status),
+          fetchEmailStats() // Fetch stats separately
+        ])
+        
+        setEmails(emailsData.emails || [])
+        setTotalCount(emailsData.totalCount || 0)
+        setHasMore(emailsData.hasMore || false)
+        
+        setLoading(false)
       } catch (error) {
         console.error('Failed to fetch data:', error)
         setLoading(false)
@@ -61,7 +156,38 @@ function EmailActivity() {
     }
 
     fetchData()
-  }, [projectFilter])
+  }, [projectFilter, statusFilter, limit]) // Remove searchQuery dependency to avoid double calls
+
+  // Handle debounced search changes
+  useEffect(() => {
+    if (!loading && debouncedSearchQuery !== searchQuery) {
+      // Search query changed, fetch with new search
+      fetchEmailsData(debouncedSearchQuery, 1)
+    }
+  }, [debouncedSearchQuery, loading])
+
+  // Fetch emails when page changes (without full page refresh)
+  useEffect(() => {
+    if (!loading && currentPage > 1) {
+      const filter = projectFilter === 'all' ? undefined : projectFilter
+      const status = statusFilter === 'all' ? undefined : statusFilter
+      const offset = (currentPage - 1) * limit
+      
+      const fetchPageEmails = async () => {
+        try {
+          const data: EmailsResponse = await getEmails(filter, searchQuery, limit, offset, status)
+          
+          setEmails(data.emails || [])
+          setTotalCount(data.totalCount || 0)
+          setHasMore(data.hasMore || false)
+        } catch (error) {
+          console.error('Failed to fetch page emails:', error)
+        }
+      }
+      
+      fetchPageEmails()
+    }
+  }, [currentPage, loading, projectFilter, statusFilter, searchQuery, limit])
 
   // Wait for EmailActivity to be stable before showing QuotaMonitor
   useEffect(() => {
@@ -84,6 +210,35 @@ function EmailActivity() {
 
   const handleProjectChange = (projectId: string) => {
     setProjectFilter(projectId)
+    setCurrentPage(1) // Reset to first page when project changes
+  }
+
+  const handleStatusChange = (status: string) => {
+    setStatusFilter(status)
+    setCurrentPage(1) // Reset to first page when status changes
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (hasMore) {
+      setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const handleClearSearch = () => {
+    setSearchQuery('')
+    if (searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
   }
 
   const getProjectName = (projectId: string) => {
@@ -107,7 +262,7 @@ function EmailActivity() {
       const result = await resendEmail(emailId)
       if (result.success) {
         // Refresh emails to show updated status
-        await fetchEmails()
+        await fetchEmailsData(searchQuery, currentPage)
       }
     } catch (error) {
       console.error('Failed to resend email:', error)
@@ -133,25 +288,25 @@ function EmailActivity() {
     }
   }
 
-  // Filter emails based on search query
-  const filteredEmails = emails.filter(email => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      email.from.toLowerCase().includes(query) ||
-      email.to.some(to => to.toLowerCase().includes(query)) ||
-      email.subject.toLowerCase().includes(query)
-    )
-  })
-
-  // Calculate stats
-  const stats = {
-    total: filteredEmails.length,
-    sent: filteredEmails.filter(e => e.status === 'delivered' || e.status === 'processed').length,
-    failed: filteredEmails.filter(e => e.status === 'failed').length,
-    queued: filteredEmails.filter(e => e.status === 'queued').length,
-    totalSize: filteredEmails.reduce((acc, e) => acc + e.size, 0)
+  // Use API stats when available, fallback to calculated stats from current page
+  const stats = emailStats ? {
+    total: emailStats.totalEmails,
+    sent: emailStats.sentEmails,
+    failed: emailStats.failedEmails,
+    queued: emailStats.queuedEmails,
+    totalSize: emailStats.totalSize
+  } : {
+    total: totalCount, // Use server-provided total count
+    sent: emails.filter(e => e.status === 'delivered' || e.status === 'processed').length,
+    failed: emails.filter(e => e.status === 'failed').length,
+    queued: emails.filter(e => e.status === 'queued').length,
+    totalSize: emails.reduce((acc, e) => acc + e.size, 0)
   }
+
+  // Calculate pagination info
+  const totalPages = Math.ceil(totalCount / limit)
+  const startItem = totalCount > 0 ? (currentPage - 1) * limit + 1 : 0
+  const endItem = Math.min(currentPage * limit, totalCount)
 
   if (loading) {
     return (
@@ -188,22 +343,33 @@ function EmailActivity() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Email Activity</h1>
             <p className="text-gray-600">
-              {projectFilter !== 'all' 
-                ? `Filtered by project: ${getProjectName(projectFilter)}`
+              {projectFilter !== 'all' || statusFilter !== 'all'
+                ? `Filtered by ${
+                    [projectFilter !== 'all' ? `project: ${getProjectName(projectFilter)}` : null,
+                     statusFilter !== 'all' ? `status: ${statusFilter}` : null
+                    ].filter(Boolean).join(', ')
+                  }`
                 : 'Monitor all emails processed through your SMTP relay'
               }
             </p>
           </div>
           
           <div className="flex items-center space-x-4">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{stats.total} emails</span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              {stats.total} total emails
+            </span>
+            {totalCount > 0 && (
+              <span className="text-sm text-gray-500">
+                Showing {startItem}-{endItem} of {totalCount}
+              </span>
+            )}
             <button 
               onClick={handleRefresh}
               className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-              disabled={loading}
+              disabled={loading || refreshingEmails}
             >
-              <ArrowPathIcon className="w-4 h-4 mr-2" />
-              Refresh
+              <ArrowPathIcon className={`w-4 h-4 mr-2 ${refreshingEmails ? 'animate-spin' : ''}`} />
+              {refreshingEmails ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
@@ -218,12 +384,41 @@ function EmailActivity() {
               <div className="relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder="Search emails by sender, recipient, or subject..."
-                  className="block w-full rounded-lg border border-gray-300 pl-10 px-3 py-2 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                  className="block w-full rounded-lg border border-gray-300 pl-10 pr-10 px-3 py-2 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {searchQuery && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Clear search"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {/* Status Filter */}
+            <div className="sm:w-48">
+              <div className="relative">
+                <FunnelIcon className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="block w-full rounded-lg border border-gray-300 pl-10 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors bg-white"
+                >
+                  <option value="all">All Status</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="processed">Processed</option>
+                  <option value="failed">Failed</option>
+                  <option value="queued">Queued</option>
+                  <option value="bounced">Bounced</option>
+                </select>
               </div>
             </div>
             
@@ -264,23 +459,45 @@ function EmailActivity() {
       </div>
 
       {/* Stats Cards */}
-      {stats.total > 0 && (
+      {(stats.total > 0 || loadingStats) && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
-            <div className="text-3xl font-bold text-green-600 mb-1">{stats.sent}</div>
+            <div className="text-3xl font-bold text-green-600 mb-1">
+              {loadingStats ? (
+                <div className="animate-pulse bg-gray-200 rounded h-8 w-12 mx-auto"></div>
+              ) : (
+                stats.sent
+              )}
+            </div>
             <div className="text-sm font-medium text-gray-500">Successful</div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
-            <div className="text-3xl font-bold text-red-600 mb-1">{stats.failed}</div>
+            <div className="text-3xl font-bold text-red-600 mb-1">
+              {loadingStats ? (
+                <div className="animate-pulse bg-gray-200 rounded h-8 w-12 mx-auto"></div>
+              ) : (
+                stats.failed
+              )}
+            </div>
             <div className="text-sm font-medium text-gray-500">Failed</div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
-            <div className="text-3xl font-bold text-yellow-600 mb-1">{stats.queued}</div>
+            <div className="text-3xl font-bold text-yellow-600 mb-1">
+              {loadingStats ? (
+                <div className="animate-pulse bg-gray-200 rounded h-8 w-12 mx-auto"></div>
+              ) : (
+                stats.queued
+              )}
+            </div>
             <div className="text-sm font-medium text-gray-500">Queued</div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
             <div className="text-3xl font-bold text-gray-600 mb-1">
-              {(stats.totalSize / 1024).toFixed(1)}KB
+              {loadingStats ? (
+                <div className="animate-pulse bg-gray-200 rounded h-8 w-12 mx-auto"></div>
+              ) : (
+                (stats.totalSize / 1024).toFixed(1) + 'KB'
+              )}
             </div>
             <div className="text-sm font-medium text-gray-500">Total Size</div>
           </div>
@@ -295,26 +512,26 @@ function EmailActivity() {
       )}
 
       {/* Email Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-opacity duration-200 ${refreshingEmails ? 'opacity-75' : 'opacity-100'}`}>
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-lg font-medium">Recent Emails</h2>
         </div>
         
-        {filteredEmails.length === 0 ? (
+        {emails.length === 0 ? (
           <div className="p-6 text-center py-12">
             <svg className="mx-auto h-12 w-12 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
             <h3 className="text-sm font-medium text-gray-900 mb-2">
-              {searchQuery ? 'No matching emails' : 'No emails yet'}
+              {debouncedSearchQuery ? 'No matching emails' : 'No emails yet'}
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              {searchQuery 
+              {debouncedSearchQuery 
                 ? 'Try adjusting your search criteria or filters.'
                 : 'Send your first email through the SMTP relay to see it here.'
               }
             </p>
-            {!searchQuery && (
+            {!debouncedSearchQuery && (
               <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded mx-auto max-w-sm">
                 <strong>SMTP Configuration:</strong><br />
                 Host: localhost<br />
@@ -338,7 +555,7 @@ function EmailActivity() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredEmails.map((email) => (
+                {emails.map((email) => (
                   <tr key={email.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       <div className="truncate max-w-[200px]">{email.from}</div>
@@ -391,6 +608,57 @@ function EmailActivity() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeftIcon className="w-4 h-4 mr-1" />
+                  Previous
+                </button>
+                <button
+                  onClick={handleNextPage}
+                  disabled={!hasMore}
+                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <ChevronRightIcon className="w-4 h-4 ml-1" />
+                </button>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                
+                {/* Page number buttons for smaller page counts */}
+                {totalPages <= 10 && (
+                  <div className="flex space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                          page === currentPage
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

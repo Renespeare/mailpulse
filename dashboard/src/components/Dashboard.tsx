@@ -8,29 +8,35 @@ import {
   ServerIcon,
   CpuChipIcon
 } from '@heroicons/react/24/outline'
-import { getProjects, getQuotaUsage, getEmailStats, type Project, type QuotaUsage, type EmailStats } from '../lib/api'
+import { getProjects, getQuotaUsage, getEmailStats, getAllEmailStats, type Project, type QuotaUsage, type EmailStats } from '../lib/api'
 
 function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [quotaData, setQuotaData] = useState<Record<string, QuotaUsage>>({})
   const [emailStats, setEmailStats] = useState<Record<string, EmailStats>>({})
+  const [allEmailStats, setAllEmailStats] = useState<EmailStats | null>(null)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Fetch projects first
-        const projectsData = await getProjects()
+        // Fetch projects and all email stats in parallel
+        const [projectsData, allStats] = await Promise.all([
+          getProjects(),
+          getAllEmailStats()
+        ])
+        
         setProjects(projectsData)
+        setAllEmailStats(allStats)
 
-        // Then fetch quota and stats for each project
-        const quotaPromises = projectsData.map(async (project) => {
+        // Fetch quota and individual stats for each project (for project cards)
+        const projectPromises = projectsData.map(async (project) => {
           const quota = await getQuotaUsage(project.id)
           const stats = await getEmailStats(project.id)
           return { projectId: project.id, quota, stats }
         })
 
-        const results = await Promise.all(quotaPromises)
+        const results = await Promise.all(projectPromises)
         
         const quotaMap: Record<string, QuotaUsage> = {}
         const statsMap: Record<string, EmailStats> = {}
@@ -55,24 +61,20 @@ function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Calculate totals across all projects
-  const totalStats = projects.reduce(
-    (acc, project) => {
-      const stats = emailStats[project.id]
-      if (stats) {
-        acc.totalEmails += stats.totalEmails
-        acc.sentEmails += stats.sentEmails
-        acc.failedEmails += stats.failedEmails
-        acc.queuedEmails += stats.queuedEmails
-      }
-      return acc
-    },
-    { totalEmails: 0, sentEmails: 0, failedEmails: 0, queuedEmails: 0 }
-  )
+  // Use API stats for totals instead of calculating client-side
+  const totalStats = allEmailStats ? {
+    totalEmails: allEmailStats.totalEmails,
+    sentEmails: allEmailStats.sentEmails,
+    failedEmails: allEmailStats.failedEmails,
+    queuedEmails: allEmailStats.queuedEmails
+  } : {
+    totalEmails: 0,
+    sentEmails: 0,
+    failedEmails: 0,
+    queuedEmails: 0
+  }
 
-  const successRate = totalStats.totalEmails > 0 
-    ? Math.round((totalStats.sentEmails / totalStats.totalEmails) * 100)
-    : 0
+  const successRate = allEmailStats?.successRate ? Math.round(allEmailStats.successRate) : 0
 
   if (loading) {
     return (
