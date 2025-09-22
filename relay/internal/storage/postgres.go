@@ -3,7 +3,6 @@ package storage
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -45,25 +44,14 @@ func NewPostgreSQLStorage(databaseURL string) (*PostgreSQLStorage, error) {
 func (s *PostgreSQLStorage) initTables() error {
 	// This is a basic table creation - in production you'd use migrations
 	
-	// First, add missing columns to existing tables
-	migrationQueries := []string{
-		`ALTER TABLE projects ADD COLUMN IF NOT EXISTS smtp_password_enc TEXT`,
-	}
-	
-	// Run migration queries first (ignore errors for columns that already exist)
-	for _, query := range migrationQueries {
-		if _, err := s.db.Exec(query); err != nil {
-			// Log but don't fail - column might already exist
-			log.Printf("Migration query result (may be expected): %v", err)
-		}
-	}
+	// No migrations needed for fresh database setup
 	
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS projects (
 			id VARCHAR(255) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
 			description TEXT DEFAULT '',
-			api_key VARCHAR(255) UNIQUE NOT NULL,
+			api_key_enc TEXT NOT NULL,
 			password_hash TEXT,
 			smtp_host VARCHAR(255),
 			smtp_port INTEGER,
@@ -76,7 +64,7 @@ func (s *PostgreSQLStorage) initTables() error {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			last_used_at TIMESTAMP WITH TIME ZONE
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_projects_api_key ON projects(api_key)`,
+		`CREATE INDEX IF NOT EXISTS idx_projects_api_key_enc ON projects(api_key_enc)`,
 		`CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)`,
 		

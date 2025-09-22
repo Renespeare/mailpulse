@@ -28,7 +28,7 @@ type Project struct {
 	ID               string
 	Name             string
 	Description      string
-	APIKey           string
+	APIKeyEnc        string    // Encrypted API key (database storage)
 	PasswordHash     *string
 	SMTPHost         *string
 	SMTPPort         *int

@@ -82,6 +82,16 @@ func DecryptSMTPPassword(ciphertext string) (string, error) {
 	return string(plaintext), nil
 }
 
+// EncryptAPIKey encrypts API key using AES-256-GCM
+func EncryptAPIKey(plaintext string) (string, error) {
+	return EncryptSMTPPassword(plaintext) // Use same encryption method
+}
+
+// DecryptAPIKey decrypts API key using AES-256-GCM
+func DecryptAPIKey(ciphertext string) (string, error) {
+	return DecryptSMTPPassword(ciphertext) // Use same decryption method
+}
+
 // getEncryptionKey gets the encryption key from environment variable
 func getEncryptionKey() []byte {
 	key := os.Getenv("ENCRYPTION_KEY")

@@ -13,6 +13,52 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// ProjectResponse represents a project for API responses (no sensitive data)
+type ProjectResponse struct {
+	ID               string    `json:"ID"`
+	Name             string    `json:"Name"`
+	Description      string    `json:"Description"`
+	APIKey           string    `json:"APIKey"`           // Decrypted for display
+	SMTPHost         *string   `json:"SMTPHost"`
+	SMTPPort         *int      `json:"SMTPPort"`
+	SMTPUser         *string   `json:"SMTPUser"`
+	QuotaDaily       int       `json:"QuotaDaily"`
+	QuotaPerMinute   int       `json:"QuotaPerMinute"`
+	Status           string    `json:"Status"`
+	UserID           *string   `json:"UserID"`
+	CreatedAt        time.Time `json:"CreatedAt"`
+	LastUsedAt       *time.Time `json:"LastUsedAt"`
+}
+
+// toProjectResponse converts a storage.Project to ProjectResponse with decrypted API key
+func toProjectResponse(project *storage.Project) (*ProjectResponse, error) {
+	// Decrypt API key for response
+	var apiKey string
+	if project.APIKeyEnc != "" {
+		decrypted, err := crypto.DecryptAPIKey(project.APIKeyEnc)
+		if err != nil {
+			return nil, err
+		}
+		apiKey = decrypted
+	}
+	
+	return &ProjectResponse{
+		ID:             project.ID,
+		Name:           project.Name,
+		Description:    project.Description,
+		APIKey:         apiKey,
+		SMTPHost:       project.SMTPHost,
+		SMTPPort:       project.SMTPPort,
+		SMTPUser:       project.SMTPUser,
+		QuotaDaily:     project.QuotaDaily,
+		QuotaPerMinute: project.QuotaPerMinute,
+		Status:         project.Status,
+		UserID:         project.UserID,
+		CreatedAt:      project.CreatedAt,
+		LastUsedAt:     project.LastUsedAt,
+	}, nil
+}
+
 // listProjectsHandler returns all projects
 func (s *Server) listProjectsHandler(w http.ResponseWriter, r *http.Request) {
 	projects, err := s.storage.ListAllProjects()
@@ -22,8 +68,19 @@ func (s *Server) listProjectsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Convert to clean response format
+	var responseProjects []*ProjectResponse
+	for _, project := range projects {
+		response, err := toProjectResponse(project)
+		if err != nil {
+			log.Printf("Failed to convert project %s to response: %v", project.ID, err)
+			continue // Skip this project rather than failing the whole request
+		}
+		responseProjects = append(responseProjects, response)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projects)
+	json.NewEncoder(w).Encode(responseProjects)
 }
 
 // createProjectHandler creates a new project
@@ -58,6 +115,14 @@ func (s *Server) createProjectHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate unique project ID and API key
 	projectID := generateID()
 	apiKey := generateAPIKey()
+
+	// Encrypt the API key
+	encryptedAPIKey, err := crypto.EncryptAPIKey(apiKey)
+	if err != nil {
+		log.Printf("Failed to encrypt API key: %v", err)
+		http.Error(w, "Failed to process API key", http.StatusInternalServerError)
+		return
+	}
 
 	// Hash the password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(strings.ToLower(req.Password)), bcrypt.DefaultCost)
@@ -94,7 +159,7 @@ func (s *Server) createProjectHandler(w http.ResponseWriter, r *http.Request) {
 		ID:             projectID,
 		Name:           req.Name,
 		Description:    req.Description,
-		APIKey:         apiKey,
+		APIKeyEnc:      encryptedAPIKey,
 		PasswordHash:   stringPtr(string(hashedPassword)),
 		SMTPHost:       stringPtrFromString(req.SMTPHost),
 		SMTPPort:       intPtrFromInt(req.SMTPPort),
@@ -130,8 +195,16 @@ func (s *Server) createProjectHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("✅ Reloaded projects in auth manager")
 	}
 
+	// Convert to clean response format
+	response, err := toProjectResponse(project)
+	if err != nil {
+		log.Printf("Failed to convert project to response: %v", err)
+		http.Error(w, "Failed to process project data", http.StatusInternalServerError)
+		return
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(project)
+	json.NewEncoder(w).Encode(response)
 }
 
 // getProjectHandler returns a specific project
@@ -146,8 +219,16 @@ func (s *Server) getProjectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Convert to clean response format
+	response, err := toProjectResponse(project)
+	if err != nil {
+		log.Printf("Failed to convert project %s to response: %v", projectID, err)
+		http.Error(w, "Failed to process project data", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(project)
+	json.NewEncoder(w).Encode(response)
 }
 
 // updateProjectHandler updates a project

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { 
   CheckCircleIcon, 
   XCircleIcon, 
@@ -6,7 +6,7 @@ import {
   InformationCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline'
-import type { ToastType, ToastMessage } from '../types/toast'
+import type { ToastMessage } from '../types/toast'
 
 interface ToastProps {
   toast: ToastMessage

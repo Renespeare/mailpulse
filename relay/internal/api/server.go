@@ -144,7 +144,7 @@ func (a *StorageAdapter) ListAllProjects() ([]*auth.StorageProject, error) {
 		authProjects = append(authProjects, &auth.StorageProject{
 			ID:             p.ID,
 			Name:           p.Name,
-			APIKey:         p.APIKey,
+			APIKeyEnc:      p.APIKeyEnc,
 			PasswordHash:   p.PasswordHash,
 			QuotaDaily:     p.QuotaDaily,
 			QuotaPerMinute: p.QuotaPerMinute,

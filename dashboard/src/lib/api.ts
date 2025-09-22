@@ -254,6 +254,11 @@ export async function getEmails(projectFilter?: string): Promise<Email[]> {
     }
     const emails = await response.json()
     
+    // Handle null response from API
+    if (!emails || !Array.isArray(emails)) {
+      return []
+    }
+    
     // Transform Go API field names to match dashboard expectations
     return emails.map((email: any) => ({
       id: email.ID,

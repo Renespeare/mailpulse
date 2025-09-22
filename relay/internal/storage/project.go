@@ -7,7 +7,7 @@ import (
 // GetProject retrieves a project by ID
 func (s *PostgreSQLStorage) GetProject(id string) (*Project, error) {
 	query := `
-		SELECT id, name, description, api_key, password_hash, smtp_host, smtp_port, smtp_user, 
+		SELECT id, name, description, api_key_enc, password_hash, smtp_host, smtp_port, smtp_user, 
 		       smtp_password_enc, quota_daily, quota_per_minute, status, user_id, created_at, last_used_at
 		FROM projects
 		WHERE id = $1
@@ -15,7 +15,7 @@ func (s *PostgreSQLStorage) GetProject(id string) (*Project, error) {
 	
 	project := &Project{}
 	err := s.db.QueryRow(query, id).Scan(
-		&project.ID, &project.Name, &project.Description, &project.APIKey,
+		&project.ID, &project.Name, &project.Description, &project.APIKeyEnc,
 		&project.PasswordHash, &project.SMTPHost, &project.SMTPPort, &project.SMTPUser,
 		&project.SMTPPasswordEnc, &project.QuotaDaily, &project.QuotaPerMinute, &project.Status,
 		&project.UserID, &project.CreatedAt, &project.LastUsedAt,
@@ -34,7 +34,7 @@ func (s *PostgreSQLStorage) GetProject(id string) (*Project, error) {
 // ListAllProjects retrieves all projects
 func (s *PostgreSQLStorage) ListAllProjects() ([]*Project, error) {
 	query := `
-		SELECT id, name, description, api_key, password_hash, smtp_host, smtp_port, smtp_user, 
+		SELECT id, name, description, api_key_enc, password_hash, smtp_host, smtp_port, smtp_user, 
 		       smtp_password_enc, quota_daily, quota_per_minute, status, user_id, created_at, last_used_at
 		FROM projects
 		WHERE status != 'deleted'
@@ -51,7 +51,7 @@ func (s *PostgreSQLStorage) ListAllProjects() ([]*Project, error) {
 	for rows.Next() {
 		project := &Project{}
 		err := rows.Scan(
-			&project.ID, &project.Name, &project.Description, &project.APIKey,
+			&project.ID, &project.Name, &project.Description, &project.APIKeyEnc,
 			&project.PasswordHash, &project.SMTPHost, &project.SMTPPort, &project.SMTPUser,
 			&project.SMTPPasswordEnc, &project.QuotaDaily, &project.QuotaPerMinute, &project.Status,
 			&project.UserID, &project.CreatedAt, &project.LastUsedAt,
@@ -73,13 +73,13 @@ func (s *PostgreSQLStorage) ListAllProjects() ([]*Project, error) {
 // CreateProject creates a new project
 func (s *PostgreSQLStorage) CreateProject(project *Project) error {
 	query := `
-		INSERT INTO projects (id, name, description, api_key, password_hash, smtp_host, smtp_port, smtp_user, 
+		INSERT INTO projects (id, name, description, api_key_enc, password_hash, smtp_host, smtp_port, smtp_user, 
 		                     smtp_password_enc, quota_daily, quota_per_minute, status, user_id, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	
 	_, err := s.db.Exec(query,
-		project.ID, project.Name, project.Description, project.APIKey, project.PasswordHash,
+		project.ID, project.Name, project.Description, project.APIKeyEnc, project.PasswordHash,
 		project.SMTPHost, project.SMTPPort, project.SMTPUser, project.SMTPPasswordEnc,
 		project.QuotaDaily, project.QuotaPerMinute, project.Status, project.UserID, project.CreatedAt)
 	

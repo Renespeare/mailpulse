@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Renespeare/mailpulse/relay/internal/crypto"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -15,8 +16,8 @@ import (
 type Project struct {
 	ID               string
 	Name             string
-	APIKey           string
-	APIKeyHash       string
+	EncryptedAPIKey  string    // Encrypted API key (AES-256-GCM)
+	SMTPPasswordHash string    // bcrypt hash of SMTP password
 	SMTPHost         string
 	SMTPPort         int
 	SMTPUsername     string
@@ -35,7 +36,7 @@ type Project struct {
 type StorageProject struct {
 	ID             string
 	Name           string
-	APIKey         string
+	APIKeyEnc      string   // Encrypted API key
 	PasswordHash   *string
 	QuotaDaily     int
 	QuotaPerMinute int
@@ -82,19 +83,19 @@ func NewInMemoryAuthManager(storage ProjectStorage) *InMemoryAuthManager {
 }
 
 // LoadProjectFromDB adds a project to the in-memory store from database data
-func (m *InMemoryAuthManager) LoadProjectFromDB(id, name, apiKey, passwordHash, status string) {
+func (m *InMemoryAuthManager) LoadProjectFromDB(id, name, apiKeyEnc, passwordHash, status string) {
 	project := &Project{
-		ID:             id,
-		Name:           name,
-		APIKey:         apiKey,
-		APIKeyHash:     passwordHash, // Store password hash in APIKeyHash field
-		Status:         status,
-		SMTPHost:       "smtp.gmail.com", // Default values
-		SMTPPort:       587,
-		QuotaDaily:     500,
-		QuotaPerMinute: 10,
-		RequireIPAllow: false,
-		CreatedAt:      time.Now(),
+		ID:               id,
+		Name:             name,
+		EncryptedAPIKey:  apiKeyEnc,     // Store encrypted API key
+		SMTPPasswordHash: passwordHash,  // Store SMTP password hash 
+		Status:           status,
+		SMTPHost:         "smtp.gmail.com", // Default values
+		SMTPPort:         587,
+		QuotaDaily:       500,
+		QuotaPerMinute:   10,
+		RequireIPAllow:   false,
+		CreatedAt:        time.Now(),
 	}
 	m.projects[id] = project
 }
@@ -121,15 +122,23 @@ func (m *InMemoryAuthManager) GenerateAPIKey(prefix string) (string, string, err
 
 // ValidateAPIKey validates username (API key) and password
 func (m *InMemoryAuthManager) ValidateAPIKey(username, password string) (*Project, error) {
-	// Find project by matching the API key directly
+	// Find project by decrypting and matching the API key
 	for _, project := range m.projects {
-		// Compare the provided username with the stored API key
-		if strings.EqualFold(project.APIKey, username) {
-			// If project has a password hash, verify the password
-			if project.APIKeyHash != "" {
+		
+		// Decrypt the stored API key
+		decryptedAPIKey, err := crypto.DecryptAPIKey(project.EncryptedAPIKey)
+		if err != nil {
+			// Skip this project if decryption fails
+			continue
+		}
+		
+		// Compare the provided username with the decrypted API key
+		if strings.EqualFold(decryptedAPIKey, username) {
+			// If project has a SMTP password hash, verify the password
+			if project.SMTPPasswordHash != "" {
 				// Convert password to lowercase for comparison (SMTP servers often uppercase)
 				lowercasePassword := strings.ToLower(password)
-				err := bcrypt.CompareHashAndPassword([]byte(project.APIKeyHash), []byte(lowercasePassword))
+				err := bcrypt.CompareHashAndPassword([]byte(project.SMTPPasswordHash), []byte(lowercasePassword))
 				if err != nil {
 					return nil, errors.New("invalid password")
 				}
@@ -248,7 +257,7 @@ func (m *InMemoryAuthManager) ReloadProjects() error {
 		if project.PasswordHash != nil {
 			passwordHash = *project.PasswordHash
 		}
-		m.LoadProjectFromDB(project.ID, project.Name, project.APIKey, passwordHash, project.Status)
+		m.LoadProjectFromDB(project.ID, project.Name, project.APIKeyEnc, passwordHash, project.Status)
 	}
 	
 	return nil
