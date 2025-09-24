@@ -5,7 +5,7 @@ import {
   CheckIcon,
   ArrowPathIcon
 } from '@heroicons/react/24/outline'
-import { resendEmail, type Email } from '../lib/api'
+import { resendEmail, type Email } from '../../lib/api'
 
 interface EmailDetailModalProps {
   email: Email

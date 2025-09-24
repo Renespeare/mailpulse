@@ -10,7 +10,7 @@ import {
   CheckIcon
 } from '@heroicons/react/24/outline'
 import { getProjects, createProject, updateProject, deleteProject, getQuotaUsage, type Project, type QuotaUsage } from '../lib/api'
-import CreateProjectModal from './CreateProjectModal'
+import CreateProjectModal from '../components/forms/CreateProjectModal'
 
 function Projects() {
   const [projects, setProjects] = useState<Project[]>([])

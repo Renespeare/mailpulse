@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { XMarkIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
-import { type Project } from '../lib/api'
-import { generatePassword } from '../lib/crypto'
+import { type Project } from '../../lib/api'
+import { generatePassword } from '../../lib/crypto'
 
 interface CreateProjectModalProps {
   onClose: () => void

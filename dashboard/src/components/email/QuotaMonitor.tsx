@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
-import { getQuotaUsage } from '../lib/api'
+import { getQuotaUsage } from '../../lib/api'
 
 interface QuotaData {
   projectId: string

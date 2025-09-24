@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { authService } from '../lib/auth'
-import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../../contexts/AuthContext'
+import { authService } from '../../lib/auth'
+import { useToast } from '../../hooks/useToast'
 import { LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
 function LoginForm() {

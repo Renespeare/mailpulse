@@ -10,8 +10,8 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline'
 import { getEmails, getProjects, resendEmail, getEmailStats, getAllEmailStats, type Email, type Project, type EmailsResponse, type EmailStats } from '../lib/api'
-import EmailDetailModal from './EmailDetailModal'
-import QuotaMonitor from './QuotaMonitor'
+import EmailDetailModal from '../components/email/EmailDetailModal'
+import QuotaMonitor from '../components/email/QuotaMonitor'
 
 function EmailActivity() {
   const [emails, setEmails] = useState<Email[]>([])

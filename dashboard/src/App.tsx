@@ -16,11 +16,12 @@ import {
 } from '@heroicons/react/24/solid'
 import { getRelayHealth } from './lib/api'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { ToastProvider, useToast } from './contexts/ToastContext'
-import ProtectedRoute from './components/ProtectedRoute'
-import Dashboard from './components/Dashboard'
-import EmailActivity from './components/EmailActivity'
-import Projects from './components/Projects'
+import { ToastProvider } from './contexts/ToastContext'
+import { useToast } from './hooks/useToast'
+import ProtectedRoute from './components/routing/ProtectedRoute'
+import Dashboard from './pages/Dashboard'
+import EmailActivity from './pages/EmailActivity'
+import Projects from './pages/Projects'
 
 interface RelayHealth {
   status: string
