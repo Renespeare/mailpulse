@@ -197,4 +197,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Remember: MailPulse requires authentication. It is not an open relay.**
+## Note
+
+MailPulse was developed with the assistance of AI tools to accelerate open source development and experimentation. This project is experimental and welcomes community contributions and feedback.
+
+---
