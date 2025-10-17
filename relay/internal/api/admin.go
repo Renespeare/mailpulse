@@ -62,7 +62,7 @@ func (s *Server) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expirationTime := time.Now().Add(8 * time.Minute) // Token valid for 8 hours
+	expirationTime := time.Now().Add(8 * time.Hour) // Token valid for 8 hours
 	claims := &AdminClaims{
 		Username: req.Username,
 		RegisteredClaims: jwt.RegisteredClaims{

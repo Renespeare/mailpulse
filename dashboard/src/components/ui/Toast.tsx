@@ -6,7 +6,7 @@ import {
   InformationCircleIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline'
-import type { ToastMessage } from '../types/toast'
+import type { ToastMessage } from '../../types/toast'
 
 interface ToastProps {
   toast: ToastMessage

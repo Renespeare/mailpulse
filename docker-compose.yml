@@ -30,6 +30,9 @@ services:
       - SMTP_PORT=2525
       - HTTP_PORT=8080
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-changeme-32-char-encryption-key}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme-secure-admin-password}
+      - JWT_SECRET=${JWT_SECRET:-changeme-jwt-secret-32-chars-min}
     ports:
       - "2525:2525"  # SMTP (AUTH REQUIRED)
       - "8080:8080"  # HTTP API
